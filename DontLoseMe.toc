@@ -1,0 +1,10 @@
+## Interface: 120000, 120001
+## Title: DontLoseMe
+## Notes: Configurable crosshair to help you keep track of your character.
+## Author: rudiracoon
+## Version: 1.0.0
+## IconTexture: Interface/AddOns/DontLoseMe/DLMIcon
+## SavedVariables: DontLoseMeDB
+
+Core.lua
+Options.lua
