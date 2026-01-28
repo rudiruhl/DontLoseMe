@@ -1,0 +1,54 @@
+name: Bundle DontLoseMe for Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write  # needed to upload release assets with GITHUB_TOKEN
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Optional: show where the files are (helps debug paths)
+      - name: List repo files
+        run: |
+          ls -la
+          find . -maxdepth 3 -type f -name "Core.lua" -o -name "Options.lua" -o -name "DLMIcon.tga" -o -name "DontLoseMe.toc" || true
+
+      - name: Create release zip (DontLoseMe folder inside)
+        run: |
+          set -euxo pipefail
+
+          TAG="${{ github.event.release.tag_name }}"
+          ZIP_NAME="DontLoseMe+${TAG}.zip"
+
+          STAGE="__stage__"
+          INNER="DontLoseMe"
+
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/$INNER"
+
+          # Adjust paths on the left side if these files live in a subfolder in your repo.
+          cp -v "Core.lua"         "$STAGE/$INNER/"
+          cp -v "Options.lua"      "$STAGE/$INNER/"
+          cp -v "DLMIcon.tga"      "$STAGE/$INNER/"
+          cp -v "DontLoseMe.toc"   "$STAGE/$INNER/"
+
+          # Zip so the top-level in the zip is the folder "DontLoseMe/"
+          (cd "$STAGE" && zip -r "../$ZIP_NAME" "$INNER")
+
+          ls -lh "$ZIP_NAME"
+
+      - name: Upload zip to the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          ZIP_NAME="DontLoseMe+${TAG}.zip"
+          gh release upload "$TAG" "$ZIP_NAME" --clobber
