@@ -5,44 +5,67 @@
 ![License](https://img.shields.io/github/license/rudiruhl/DontLoseMe)
 ![Last Commit](https://img.shields.io/github/last-commit/rudiruhl/DontLoseMe)
 
-**DontLoseMe** is a lightweight World of Warcraft addon that displays a configurable crosshair on your character, helping you stay oriented and never lose yourself during chaotic combat situations.
+# DontLoseMe
+
+**DontLoseMe** is a simple, lightweight World of Warcraft addon that displays a configurable crosshair on your character.
+
+The goal is to help you stay oriented during combat, keeping your eyes focused on the action instead of losing track of your character in visual clutter.
 
 ---
 
-## ✨ Features
+## Why use this addon?
 
-- 🎯 On-screen crosshair centered on your character
-- 🧩 Flexible display conditions (multi-select):
-  - Always
-  - In Party
-  - In Raid
-  - Only in Combat
-- ➕ Two crosshair shapes:
-  - Plus (+)
-  - Diagonal X
-- 🎨 Fully customizable:
-  - Size
-  - Thickness
-  - Color (with opacity)
-  - X / Y offset
-- ⚙️ Smart behavior:
-  - Automatically enables/disables based on selected conditions
-  - Controls grey out when inactive
-- 🚀 Lightweight and performance-friendly
-- 🧩 Built for **World of Warcraft Retail (12.0+)**
+### Extremely lightweight
+DontLoseMe uses no external libraries and no heavy frameworks.  
+It draws a simple UI overlay and does exactly one thing.
+
+### Better visibility in combat
+The crosshair stays centered on your character and remains visible even in chaotic encounters with many spell effects and players.
+
+### Flexible conditions
+You can choose exactly when the crosshair is shown:
+- Always
+- In party
+- In raid
+- Only in combat  
+
+Conditions can be combined, and the addon automatically enables or disables itself based on your selection.
+
+### Simple customization
+You can adjust:
+- Crosshair shape (Plus or X)
+- Size and thickness
+- Color and opacity
+- X / Y position offset  
+
+All settings are available through the modern Retail Settings UI.
+
+### Clean behavior
+If no conditions are selected, the addon automatically disables itself.  
+When inactive, configuration controls are greyed out to avoid confusion.
 
 ---
 
-## 📄 License
+## Configuration
 
-MIT License  
-Free to use, modify, and distribute.
+Open the settings via:
+- **Esc → Options → AddOns → DontLoseMe**
+- Or use the slash commands:
+
+`/dontloseme
+/dlm`
+
 
 ---
 
-## 🤝 Contributing
+## Compatibility
 
-Issues and pull requests are welcome.  
-If you have ideas for improvements or bug fixes, feel free to open an issue.
+- World of Warcraft **Retail only**
+- Tested with **Interface Version 12.0+**
+- Not compatible with Classic-era clients
 
+---
+
+Feel free to fork the project — just give credit.  
+Feedback and suggestions are always welcome.
 
