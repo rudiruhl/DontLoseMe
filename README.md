@@ -5,8 +5,6 @@
 ![License](https://img.shields.io/github/license/rudiruhl/DontLoseMe)
 ![Last Commit](https://img.shields.io/github/last-commit/rudiruhl/DontLoseMe)
 
-# DontLoseMe
-
 **DontLoseMe** is a simple, lightweight World of Warcraft addon that displays a configurable crosshair on your character.
 
 The goal is to help you stay oriented during combat, keeping your eyes focused on the action instead of losing track of your character in visual clutter.
