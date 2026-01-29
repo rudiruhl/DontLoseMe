@@ -78,9 +78,22 @@ local xB = Root:CreateTexture(nil, "OVERLAY")
 xA:SetColorTexture(1, 1, 1, 1)
 xB:SetColorTexture(1, 1, 1, 1)
 
+-- Double chevrons
+local ch1A = Root:CreateTexture(nil, "OVERLAY")
+local ch1B = Root:CreateTexture(nil, "OVERLAY")
+local ch2A = Root:CreateTexture(nil, "OVERLAY")
+local ch2B = Root:CreateTexture(nil, "OVERLAY")
+ch1A:SetColorTexture(1,1,1,1)
+ch1B:SetColorTexture(1,1,1,1)
+ch2A:SetColorTexture(1,1,1,1)
+ch2B:SetColorTexture(1,1,1,1)
+
+
 local function HideAllShapes()
   plusH:Hide(); plusV:Hide()
   xA:Hide(); xB:Hide()
+  ch1A:Hide(); ch1B:Hide();
+  ch2A:Hide(); ch2B:Hide()
 end
 
 local function ApplyColor(r, g, b, a)
@@ -88,6 +101,28 @@ local function ApplyColor(r, g, b, a)
   plusV:SetColorTexture(r, g, b, a)
   xA:SetColorTexture(r, g, b, a)
   xB:SetColorTexture(r, g, b, a)
+
+  ch1A:SetColorTexture(r, g, b, a)
+  ch1B:SetColorTexture(r, g, b, a)
+  ch2A:SetColorTexture(r, g, b, a)
+  ch2B:SetColorTexture(r, g, b, a)
+end
+
+local function PlaceV(texA, texB, y, armLen, thickness, leftRot, rightRot)
+
+  local dx = armLen * 0.35
+
+  texA:ClearAllPoints()
+  texA:SetPoint("CENTER", Root, "CENTER", -dx, y)
+  texA:SetSize(armLen, thickness)
+  texA:SetRotation(leftRot)
+  texA:Show()
+
+  texB:ClearAllPoints()
+  texB:SetPoint("CENTER", Root, "CENTER", dx, y)
+  texB:SetSize(armLen, thickness)
+  texB:SetRotation(rightRot)
+  texB:Show()  
 end
 
 local function ApplyLayout()
@@ -120,8 +155,30 @@ local function ApplyLayout()
     xB:SetSize(size, t)
     xB:SetRotation(math.rad(-45))
     xB:Show()
+
+  elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
+    -- Geometry
+    local angle = math.rad(35)
+    local armLen = size
+    local gap = math.max(2, t*2)
+
+    -- stacked offset
+    local yTop = gap * 0.6
+    local yBot = -gap * 0.6
+
+    local leftRot, rightRot
+    if shape == "CHEVRON_DN" then
+      leftRot  = -angle
+      rightRot = angle
+    else
+      leftRot  = angle
+      rightRot = -angle
+    end
+
+    PlaceV(ch1A, ch1B, yTop, armLen, t, leftRot, rightRot)
+    PlaceV(ch2A, ch2B, yBot, armLen, t, leftRot, rightRot)
   else
-    -- PLUS (+) default
+
     plusH:ClearAllPoints()
     plusH:SetPoint("CENTER", Root, "CENTER", 0, 0)
     plusH:SetSize(size, t)

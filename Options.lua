@@ -253,6 +253,8 @@ shape = MakeDropdown(
   {
     { text = "Plus (+)", value = "PLUS" },
     { text = "X (diagonal)", value = "X" },
+    { text = "Chevrons (Down)", value = "CHEVRON_DN" },
+    { text = "Chevrons (Up)", value = "CHEVRON_UP" },
   },
   function() return (DontLoseMeDB and DontLoseMeDB.shape) or FALLBACKS.shape end,
   function(v) DB().shape = v end
