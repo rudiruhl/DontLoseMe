@@ -5,6 +5,9 @@ local ADDON, ns = ...
 DontLoseMe = DontLoseMe or {}
 DontLoseMe.CATEGORY_ID = nil
 
+-- -------------------------------------------------------------------
+-- Database accessors + helpers
+-- -------------------------------------------------------------------
 local FALLBACKS = {
   enabled = true,
   conditions = { always = true, party = false, raid = false, combat = false },
