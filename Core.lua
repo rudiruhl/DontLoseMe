@@ -1,4 +1,4 @@
--- DontLoseMe - Core.lua 
+-- DontLoseMe - Core.lua
 local ADDON, ns = ...
 
 local defaults = {
@@ -8,16 +8,24 @@ local defaults = {
     always = true,
     party = false,
     raid = false,
-    combat = false, 
+    combat = false,
   },
 
   shape = "PLUS",
   size = 18,
   thickness = 2,
 
+  -- Main color
   r = 1, g = 1, b = 1, a = 0.9,
+
+  -- Position
   offsetX = 0,
   offsetY = 0,
+
+  -- Outline
+  outlineEnabled = false,
+  outlineThickness = 2,
+  or_ = 0, og = 0, ob = 0, oa = 1,
 }
 
 local function CopyDefaults(src, dst)
@@ -35,6 +43,7 @@ end
 -- DB must exist immediately
 DontLoseMeDB = CopyDefaults(defaults, DontLoseMeDB or {})
 
+-- Migration from old single mode field
 if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.conditions) ~= "table") then
   DontLoseMeDB.conditions = {
     always = DontLoseMeDB.mode == "ALWAYS",
@@ -45,6 +54,7 @@ if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.condi
   DontLoseMeDB.mode = nil
 end
 
+-- Ensure conditions keys exist
 do
   local c = DontLoseMeDB.conditions
   if type(c) ~= "table" then
@@ -66,63 +76,91 @@ Root:SetFrameLevel(10)
 Root:EnableMouse(false)
 Root:SetClampedToScreen(true)
 
--- PLUS (+) pieces
-local plusH = Root:CreateTexture(nil, "OVERLAY")
-local plusV = Root:CreateTexture(nil, "OVERLAY")
-plusH:SetColorTexture(1, 1, 1, 1)
-plusV:SetColorTexture(1, 1, 1, 1)
+-- Helper to create a bar texture
+local function NewBar(layer)
+  local t = Root:CreateTexture(nil, layer or "OVERLAY")
+  t:SetColorTexture(1, 1, 1, 1)
+  return t
+end
 
--- X pieces (diagonals)
-local xA = Root:CreateTexture(nil, "OVERLAY")
-local xB = Root:CreateTexture(nil, "OVERLAY")
-xA:SetColorTexture(1, 1, 1, 1)
-xB:SetColorTexture(1, 1, 1, 1)
+-- Outline bars (BACKGROUND) - drawn behind the main bars
+local o_plusH = NewBar("BACKGROUND")
+local o_plusV = NewBar("BACKGROUND")
+local o_xA    = NewBar("BACKGROUND")
+local o_xB    = NewBar("BACKGROUND")
+local o_ch1A  = NewBar("BACKGROUND")
+local o_ch1B  = NewBar("BACKGROUND")
+local o_ch2A  = NewBar("BACKGROUND")
+local o_ch2B  = NewBar("BACKGROUND")
 
--- Double chevrons
-local ch1A = Root:CreateTexture(nil, "OVERLAY")
-local ch1B = Root:CreateTexture(nil, "OVERLAY")
-local ch2A = Root:CreateTexture(nil, "OVERLAY")
-local ch2B = Root:CreateTexture(nil, "OVERLAY")
-ch1A:SetColorTexture(1,1,1,1)
-ch1B:SetColorTexture(1,1,1,1)
-ch2A:SetColorTexture(1,1,1,1)
-ch2B:SetColorTexture(1,1,1,1)
-
+-- Main bars (OVERLAY)
+local plusH = NewBar("OVERLAY")
+local plusV = NewBar("OVERLAY")
+local xA    = NewBar("OVERLAY")
+local xB    = NewBar("OVERLAY")
+local ch1A  = NewBar("OVERLAY")
+local ch1B  = NewBar("OVERLAY")
+local ch2A  = NewBar("OVERLAY")
+local ch2B  = NewBar("OVERLAY")
 
 local function HideAllShapes()
+  -- Outline
+  o_plusH:Hide(); o_plusV:Hide()
+  o_xA:Hide(); o_xB:Hide()
+  o_ch1A:Hide(); o_ch1B:Hide()
+  o_ch2A:Hide(); o_ch2B:Hide()
+
+  -- Main
   plusH:Hide(); plusV:Hide()
   xA:Hide(); xB:Hide()
-  ch1A:Hide(); ch1B:Hide();
+  ch1A:Hide(); ch1B:Hide()
   ch2A:Hide(); ch2B:Hide()
 end
 
-local function ApplyColor(r, g, b, a)
-  plusH:SetColorTexture(r, g, b, a)
-  plusV:SetColorTexture(r, g, b, a)
-  xA:SetColorTexture(r, g, b, a)
-  xB:SetColorTexture(r, g, b, a)
+local function ApplyColors(mainR, mainG, mainB, mainA, outR, outG, outB, outA)
+  -- Main
+  plusH:SetColorTexture(mainR, mainG, mainB, mainA)
+  plusV:SetColorTexture(mainR, mainG, mainB, mainA)
+  xA:SetColorTexture(mainR, mainG, mainB, mainA)
+  xB:SetColorTexture(mainR, mainG, mainB, mainA)
+  ch1A:SetColorTexture(mainR, mainG, mainB, mainA)
+  ch1B:SetColorTexture(mainR, mainG, mainB, mainA)
+  ch2A:SetColorTexture(mainR, mainG, mainB, mainA)
+  ch2B:SetColorTexture(mainR, mainG, mainB, mainA)
 
-  ch1A:SetColorTexture(r, g, b, a)
-  ch1B:SetColorTexture(r, g, b, a)
-  ch2A:SetColorTexture(r, g, b, a)
-  ch2B:SetColorTexture(r, g, b, a)
+  -- Outline
+  o_plusH:SetColorTexture(outR, outG, outB, outA)
+  o_plusV:SetColorTexture(outR, outG, outB, outA)
+  o_xA:SetColorTexture(outR, outG, outB, outA)
+  o_xB:SetColorTexture(outR, outG, outB, outA)
+  o_ch1A:SetColorTexture(outR, outG, outB, outA)
+  o_ch1B:SetColorTexture(outR, outG, outB, outA)
+  o_ch2A:SetColorTexture(outR, outG, outB, outA)
+  o_ch2B:SetColorTexture(outR, outG, outB, outA)
 end
 
-local function PlaceV(texA, texB, y, armLen, thickness, leftRot, rightRot)
+local function PlaceBar(tex, cx, cy, w, h, rot)
+  tex:ClearAllPoints()
+  tex:SetPoint("CENTER", Root, "CENTER", cx, cy)
+  tex:SetSize(w, h)
+  tex:SetRotation(rot or 0)
+  tex:Show()
+end
 
+local function PlaceOutlined(outTex, mainTex, cx, cy, w, h, rot, outlineOn, outlineThickness)
+  if outlineOn then
+    PlaceBar(outTex, cx, cy, w + outlineThickness * 2, h + outlineThickness * 2, rot)
+  else
+    outTex:Hide()
+  end
+  PlaceBar(mainTex, cx, cy, w, h, rot)
+end
+
+local function PlaceV(outA, outB, texA, texB, y, armLen, thickness, leftRot, rightRot, outlineOn, outlineThickness)
   local dx = armLen * 0.35 -- horizontal offset
 
-  texA:ClearAllPoints()
-  texA:SetPoint("CENTER", Root, "CENTER", -dx, y)
-  texA:SetSize(armLen, thickness)
-  texA:SetRotation(leftRot)
-  texA:Show()
-
-  texB:ClearAllPoints()
-  texB:SetPoint("CENTER", Root, "CENTER", dx, y)
-  texB:SetSize(armLen, thickness)
-  texB:SetRotation(rightRot)
-  texB:Show()  
+  PlaceOutlined(outA, texA, -dx, y, armLen, thickness, leftRot, outlineOn, outlineThickness)
+  PlaceOutlined(outB, texB,  dx, y, armLen, thickness, rightRot, outlineOn, outlineThickness)
 end
 
 local function ApplyLayout()
@@ -139,30 +177,26 @@ local function ApplyLayout()
   Root:SetSize(size, size)
 
   local r, g, b, a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
-  ApplyColor(r, g, b, a)
+
+  local outlineOn = db.outlineEnabled and true or false
+  local oT = tonumber(db.outlineThickness) or defaults.outlineThickness
+  if oT < 1 then oT = 1 end
+  if oT > 10 then oT = 10 end
+
+  local or_, og, ob, oa = db.or_ or defaults.or_, db.og or defaults.og, db.ob or defaults.ob, db.oa or defaults.oa
+  ApplyColors(r, g, b, a, or_, og, ob, oa)
 
   HideAllShapes()
 
   if shape == "X" then
-    xA:ClearAllPoints()
-    xA:SetPoint("CENTER", Root, "CENTER", 0, 0)
-    xA:SetSize(size, t)
-    xA:SetRotation(math.rad(45))
-    xA:Show()
-
-    xB:ClearAllPoints()
-    xB:SetPoint("CENTER", Root, "CENTER", 0, 0)
-    xB:SetSize(size, t)
-    xB:SetRotation(math.rad(-45))
-    xB:Show()
+    PlaceOutlined(o_xA, xA, 0, 0, size, t, math.rad(45),  outlineOn, oT)
+    PlaceOutlined(o_xB, xB, 0, 0, size, t, math.rad(-45), outlineOn, oT)
 
   elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
-    -- Geometry
     local angle = math.rad(35)
     local armLen = size
-    local gap = math.max(2, t*2)
+    local gap = math.max(2, t * 2)
 
-    -- stacked offset
     local yTop = gap * 0.6
     local yBot = -gap * 0.6
 
@@ -175,19 +209,13 @@ local function ApplyLayout()
       rightRot = -angle
     end
 
-    PlaceV(ch1A, ch1B, yTop, armLen, t, leftRot, rightRot)
-    PlaceV(ch2A, ch2B, yBot, armLen, t, leftRot, rightRot)
+    PlaceV(o_ch1A, o_ch1B, ch1A, ch1B, yTop, armLen, t, leftRot, rightRot, outlineOn, oT)
+    PlaceV(o_ch2A, o_ch2B, ch2A, ch2B, yBot, armLen, t, leftRot, rightRot, outlineOn, oT)
+
   else
-
-    plusH:ClearAllPoints()
-    plusH:SetPoint("CENTER", Root, "CENTER", 0, 0)
-    plusH:SetSize(size, t)
-    plusH:Show()
-
-    plusV:ClearAllPoints()
-    plusV:SetPoint("CENTER", Root, "CENTER", 0, 0)
-    plusV:SetSize(t, size)
-    plusV:Show()
+    -- PLUS default
+    PlaceOutlined(o_plusH, plusH, 0, 0, size, t, 0, outlineOn, oT)
+    PlaceOutlined(o_plusV, plusV, 0, 0, t, size, 0, outlineOn, oT)
   end
 end
 
@@ -208,7 +236,6 @@ local function ShouldShow()
   local inRaid  = IsInRaid()
   local inParty = inGroup and not inRaid
 
-  -- If none of Always/Party/Raid selected -> show nowhere (options auto-disables enabled anyway)
   if not AnyContextSelected(c) then
     return false
   end
@@ -256,4 +283,3 @@ ev:SetScript("OnEvent", function(_, event)
     RefreshVisibility()
   end
 end)
-
