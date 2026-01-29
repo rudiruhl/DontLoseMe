@@ -14,6 +14,9 @@ local FALLBACKS = {
   offsetX = 0,
   offsetY = 0,
   r = 1, g = 1, b = 1, a = 0.9,
+  outlineEnabled = false,
+  outlineThickness = 2,
+  outlineR = 0, outlineG = 0, outlineB = 0, outlineA = 1,
 }
 
 local function DB()
@@ -44,6 +47,16 @@ local function EnsureUIState()
   end
 end
 
+local function EnsureOutline()
+  local db = DB()
+  if db.outlineEnabled == nil then db.outlineEnabled = FALLBACKS.outlineEnabled end
+  if db.outlineThickness == nil then db.outlineThickness = FALLBACKS.outlineThickness end
+  if db.outlineR == nil then db.outlineR = FALLBACKS.outlineR end
+  if db.og == nil then db.og = FALLBACKS.og end
+  if db.ob == nil then db.ob = FALLBACKS.ob end
+  if db.oa == nil then db.oa = FALLBACKS.oa end
+end
+
 local function Clamp(v, minv, maxv)
   v = tonumber(v) or minv
   if v < minv then return minv end
@@ -54,6 +67,8 @@ end
 -- -------------------------------------------------------------------
 -- UI helpers
 -- -------------------------------------------------------------------
+
+-- Label
 local function MakeLabel(parent, text, point, rel, relPoint, x, y, template)
   local fs = parent:CreateFontString(nil, "ARTWORK", template or "GameFontNormal")
   fs:SetText(text)
@@ -65,6 +80,7 @@ local function MakeLabel(parent, text, point, rel, relPoint, x, y, template)
   return fs
 end
 
+-- Checkbox
 local function MakeCheckbox(parent, label, tooltip, get, set)
   local cb = CreateFrame("CheckButton", nil, parent, "InterfaceOptionsCheckButtonTemplate")
   cb.Text:SetText(label)
@@ -79,6 +95,114 @@ local function MakeCheckbox(parent, label, tooltip, get, set)
   return cb
 end
 
+-- Shape preview
+local function CreateShapeTextures(parent)
+  local t = {}
+
+  -- main
+  t.plusH = parent:CreateTexture(nil, "ARTWORK"); t.plusH:SetColorTexture(1,1,1,1)
+  t.plusV = parent:CreateTexture(nil, "ARTWORK"); t.plusV:SetColorTexture(1,1,1,1)
+
+  t.xA = parent:CreateTexture(nil, "ARTWORK"); t.xA:SetColorTexture(1,1,1,1)
+  t.xB = parent:CreateTexture(nil, "ARTWORK"); t.xB:SetColorTexture(1,1,1,1)
+
+  t.ch1A = parent:CreateTexture(nil, "ARTWORK"); t.ch1A:SetColorTexture(1,1,1,1)
+  t.ch1B = parent:CreateTexture(nil, "ARTWORK"); t.ch1B:SetColorTexture(1,1,1,1)
+  t.ch2A = parent:CreateTexture(nil, "ARTWORK"); t.ch2A:SetColorTexture(1,1,1,1)
+  t.ch2B = parent:CreateTexture(nil, "ARTWORK"); t.ch2B:SetColorTexture(1,1,1,1)
+
+  -- outline (drawn behind)
+  t.o_plusH = parent:CreateTexture(nil, "BACKGROUND"); t.o_plusH:SetColorTexture(0,0,0,1)
+  t.o_plusV = parent:CreateTexture(nil, "BACKGROUND"); t.o_plusV:SetColorTexture(0,0,0,1)
+
+  t.o_xA = parent:CreateTexture(nil, "BACKGROUND"); t.o_xA:SetColorTexture(0,0,0,1)
+  t.o_xB = parent:CreateTexture(nil, "BACKGROUND"); t.o_xB:SetColorTexture(0,0,0,1)
+
+  t.o_ch1A = parent:CreateTexture(nil, "BACKGROUND"); t.o_ch1A:SetColorTexture(0,0,0,1)
+  t.o_ch1B = parent:CreateTexture(nil, "BACKGROUND"); t.o_ch1B:SetColorTexture(0,0,0,1)
+  t.o_ch2A = parent:CreateTexture(nil, "BACKGROUND"); t.o_ch2A:SetColorTexture(0,0,0,1)
+  t.o_ch2B = parent:CreateTexture(nil, "BACKGROUND"); t.o_ch2B:SetColorTexture(0,0,0,1)
+
+  return t
+end
+
+local function HideAll(t)
+  for _, tex in pairs(t) do tex:Hide() end
+end
+
+local previewRoot = CreateFrame("Frame", nil, preview)
+previewRoot:SetPoint("CENTER", preview, "CENTER", 0, 0)
+previewRoot:SetSize(1, 1)
+
+local PT = CreateShapeTextures(previewRoot)
+
+local function PlaceBar(tex, cx, cy, w, h, rot)
+  tex:ClearAllPoints()
+  tex:SetPoint("CENTER", previewRoot, "CENTER", cx, cy)
+  tex:SetSize(w, h)
+  tex:SetRotation(rot or 0)
+  tex:Show()
+end
+
+local function RenderShape(t, db)
+  HideAll(t)
+
+  local size = Clamp(db.size or FALLBACKS.size, 6, 80)
+  local thick = Clamp(db.thickness or FALLBACKS.thickness, 1, 10)
+  local r,g,b,a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
+
+  local outlineOn = db.outlineEnabled and true or false
+  local oT = Clamp(db.outlineThickness or FALLBACKS.outlineThickness, 1, 10)
+  local or_,og,ob,oa = db.or or 0, db.og or 0, db.ob or 0, db.oa or 1
+
+  local shape = db.shape or FALLBACKS.shape
+
+  local function setMain(tex) tex:SetColorTexture(r,g,b,a) end
+  local function setOut(tex)  tex:SetColorTexture(or_,og,ob,oa) end
+
+  -- helper: outline version of same bar (bigger behind)
+  local function PlaceOutlined(outTex, mainTex, cx, cy, w, h, rot)
+    if outlineOn then
+      setOut(outTex)
+      PlaceBar(outTex, cx, cy, w + oT*2, h + oT*2, rot)
+    end
+    setMain(mainTex)
+    PlaceBar(mainTex, cx, cy, w, h, rot)
+  end
+
+  if shape == "PLUS" then
+    PlaceOutlined(t.o_plusH, t.plusH, 0, 0, size, thick, 0)
+    PlaceOutlined(t.o_plusV, t.plusV, 0, 0, thick, size, 0)
+
+  elseif shape == "X" then
+    PlaceOutlined(t.o_xA, t.xA, 0, 0, size, thick, math.rad(45))
+    PlaceOutlined(t.o_xB, t.xB, 0, 0, size, thick, math.rad(-45))
+
+  elseif shape == "CHEVRON_DD" or shape == "CHEVRON_DU" then
+    local angle = math.rad(35)
+    local armLen = size
+    local dx = armLen * 0.25
+    local gap = math.max(2, thick * 2)
+    local yTop = gap * 0.6
+    local yBot = -gap * 0.6
+
+    local leftRot, rightRot
+    if shape == "CHEVRON_DD" then
+      leftRot, rightRot = angle, -angle
+    else
+      leftRot, rightRot = -angle, angle
+    end
+
+    -- top V
+    PlaceOutlined(t.o_ch1A, t.ch1A, -dx, yTop, armLen, thick, leftRot)
+    PlaceOutlined(t.o_ch1B, t.ch1B,  dx, yTop, armLen, thick, rightRot)
+    -- bottom V
+    PlaceOutlined(t.o_ch2A, t.ch2A, -dx, yBot, armLen, thick, leftRot)
+    PlaceOutlined(t.o_ch2B, t.ch2B,  dx, yBot, armLen, thick, rightRot)
+  end
+end
+
+-- Slider
 local function MakeSlider(parent, label, minv, maxv, step, get, set)
   local s = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
   s:SetMinMaxValues(minv, maxv)
@@ -100,7 +224,7 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
   return s
 end
 
--- Number input (label on RIGHT of box, centered text)
+-- Number box
 local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc)
   local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
   eb:SetAutoFocus(false)
@@ -139,6 +263,7 @@ local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc)
   return eb, lbl
 end
 
+-- Dropdown
 local function MakeDropdown(parent, items, get, set)
   local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
   UIDropDownMenu_SetWidth(dd, 180)
@@ -210,10 +335,12 @@ enabled:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", -2, -12)
 local condAlways, condParty, condRaid, condCombat
 local UpdateScrollHeight
 local shapeLabel, shape
+local preview
 local size, thickness, offsetX, offsetY
 local sizeBox, offsetXBox, offsetYBox, thicknessBox
 local sizeBoxLbl, offsetXBoxLbl, offsetYBoxLbl, thicknessBoxLbl
 local colorBtn, swatch
+local outlineEnabled
 
 -- Collapsible conditions widgets
 local conditionsBtn, conditionsHeader, conditionsGroup, conditionsArrow, conditionsSpacer
@@ -258,6 +385,13 @@ local function UpdateControlState()
   if thicknessBoxLbl then thicknessBoxLbl:SetAlpha(a) end
   if offsetXBoxLbl then offsetXBoxLbl:SetAlpha(a) end
   if offsetYBoxLbl then offsetYBoxLbl:SetAlpha(a) end
+
+  local outlineOn = DB().outlineEnabled and true or false
+  if outlineThickness then if outlineOn then outlineThickness:Enable() else outlineThickness:Disable() end end
+  if outlineThicknessBox then if outlineOn then outlineThicknessBox:Enable() else outlineThicknessBox:Disable() end end
+  if outlineColorBtn then if outlineOn then outlineColorBtn:Enable() else outlineColorBtn:Disable() end end
+  if outlineSwatch then outlineSwatch:SetAlpha(outlineOn and 1 or 0.3) end
+
 end
 
 local function ApplyConditionRules(changedKey)
@@ -394,6 +528,21 @@ shape = MakeDropdown(
   function(v) DB().shape = v end
 )
 shape:SetPoint("TOPLEFT", shapeLabel, "BOTTOMLEFT", -16, -6)
+
+-- Preview box (right side)
+preview = CreateFrame("Frame", nil, content, "BackdropTemplate")
+preview:SetSize(300, 300)
+preview:SetPoint("TOPLEFT", shape, "BOTTOMRIGHT", 260, -10)
+preview:SetBackdrop({
+  bgFile = "Interface/ChatFrame/ChatFrameBackground",
+  edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+  tile = true, tileSize = 16, edgeSize = 12,
+  insets = { left = 3, right = 3, top = 3, bottom = 3 },
+})
+preview:SetBackdropColor(0, 0, 0, 0.35)
+
+local previewTitle = MakeLabel(content, "Preview", "BOTTOMLEFT", preview, "TOPLEFT", 6, 6, "GameFontNormal")
+
 
 -- Layout constants
 local SLIDER_GAP  = 34
@@ -533,6 +682,80 @@ colorBtn:SetScript("OnClick", function()
   end
 end)
 
+outlineEnabled = MakeCheckbox(
+  content,
+  "Enable outline",
+  "Draw a separate outline behind the shape.",
+  function() return DB().outlineEnabled and true or false end,
+  function(v) DB().outlineEnabled = v and true or false end
+)
+outlineEnabled:SetPoint("TOPLEFT", colorBtn, "BOTTOMLEFT", 0, -14)
+
+outlineThickness = MakeSlider(
+  content, "Outline Thickness", 1, 10, 1,
+  function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
+  function(v) DB().outlineThickness = v end
+)
+outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 2, -22)
+
+outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(
+  content, "px", 1, 10,
+  function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
+  function(v) DB().outlineThickness = v end
+)
+outlineThicknessBox:SetPoint("TOP", outlineThickness, "BOTTOM", 0, -BOX_GAP)
+
+outlineThickness:HookScript("OnValueChanged", function()
+  if outlineThicknessBox and outlineThicknessBox.Refresh then outlineThicknessBox:Refresh() end
+end)
+
+local outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+outlineColorBtn:SetSize(160, 24)
+outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + 18))
+outlineColorBtn:SetText("Set Outline Color...")
+
+local outlineSwatch = content:CreateTexture(nil, "ARTWORK")
+outlineSwatch:SetSize(18, 18)
+outlineSwatch:SetPoint("LEFT", outlineColorBtn, "RIGHT", 12, 0)
+
+local function UpdateOutlineSwatch()
+  local db = DB()
+  outlineSwatch:SetColorTexture(db.or or 0, db.og or 0, db.ob or 0, db.oa or 1)
+end
+
+outlineColorBtn:SetScript("OnClick", function()
+  local db = DB()
+  local info = {
+    r = db.or or FALLBACKS.or, g = db.og or FALLBACKS.og, b = db.ob or FALLBACKS.ob,
+    hasOpacity = true,
+    opacity = 1 - (db.oa or FALLBACKS.oa),
+    previousValues = { db.or or FALLBACKS.or, db.og or FALLBACKS.og, db.ob or FALLBACKS.ob, 1 - (db.oa or FALLBACKS.oa) },
+  }
+
+  info.swatchFunc = function()
+    local r,g,b = ColorPickerFrame:GetColorRGB()
+    local opacity = (OpacitySliderFrame and OpacitySliderFrame:GetValue()) or info.opacity or 0
+    db.or, db.og, db.ob, db.oa = r, g, b, (1 - opacity)
+    UpdateOutlineSwatch()
+    ns.RefreshAll()
+    RenderShape(PT, db)
+  end
+  info.opacityFunc = info.swatchFunc
+
+  info.cancelFunc = function(prev)
+    if type(prev) == "table" then
+      db.or, db.og, db.ob = prev[1], prev[2], prev[3]
+      db.oa = 1 - (prev[4] or 0)
+      UpdateOutlineSwatch()
+      ns.RefreshAll()
+      RenderShape(PT, db)
+    end
+  end
+
+  ColorPickerFrame:SetupColorPickerAndShow(info)
+end)
+
+
 -- Set content size so scrollbar knows how far it can scroll
 UpdateScrollHeight = function()
   content:SetWidth(panel:GetWidth() > 0 and panel:GetWidth() or 500)
@@ -554,8 +777,10 @@ end
 -- -------------------------------------------------------------------
 panel:SetScript("OnShow", function()
   EnsureUIState()
+  EnsureOutline()
   UpdateScrollHeight()
   RefreshConditionsCollapse()
+  RenderShape(PT, DB())
 
   ApplyConditionRules("init")
 
