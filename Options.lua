@@ -89,6 +89,44 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
   return s
 end
 
+local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc)
+  local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+  eb:SetAutoFocus(false)
+  eb:SetSize(60, 20)
+  eb:SetNumeric(true)
+
+  MakeLabel(parent, label, "RIGHT", eb, "LEFT", -4, 0)
+
+  local function Apply()
+    local value = tonumber(eb:GetText())
+    if not value then
+      eb:SetText(tostring(getFunc()))
+      return
+    end
+    value = Clamp(value, minv, maxv)
+    setFunc(value)
+    eb:SetText(tostring(value))
+    ns.RefreshAll()
+  end
+
+  eb:SetScript("OnEnterPressed", function(self)
+    self:ClearFocus()
+    Apply()
+  end)
+
+  eb:SetScript("OnEditFocusLost", function()
+    Apply()
+  end)
+
+  eb.Refresh = function()
+    eb:SetText(tostring(getFunc()))
+  end
+
+  return eb
+end
+
+
+
 local function MakeDropdown(parent, items, get, set)
   local dd = CreateFrame("Frame", nil, parent, "UIDropDownMenuTemplate")
   UIDropDownMenu_SetWidth(dd, 180)
@@ -153,6 +191,7 @@ local condAlways, condParty, condRaid, condCombat
 -- Shape + sliders references (needed for grey-out function)
 local shapeLabel, shape
 local size, thickness, offsetX, offsetY
+local sizeBox, offsetXBox, offsetYBox
 local colorBtn, swatch
 
 local function UpdateSwatch()
@@ -166,17 +205,23 @@ local function UpdateControlState()
   if enabledState then
     UIDropDownMenu_EnableDropDown(shape)
     size:Enable()
+    sizeBox:Enable()
     thickness:Enable()
     offsetX:Enable()
+    offsetXBox:Enable()
     offsetY:Enable()
+    offsetYBox:Enable()
     colorBtn:Enable()
     swatch:SetAlpha(1)
   else
     UIDropDownMenu_DisableDropDown(shape)
     size:Disable()
+    sizeBox:Disable()
     thickness:Disable()
     offsetX:Disable()
+    offsetXBox:Disable()
     offsetY:Disable()
+    offsetYBox:Disable()
     colorBtn:Disable()
     swatch:SetAlpha(0.3)
   end
@@ -269,6 +314,19 @@ size = MakeSlider(
 )
 size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 36, -34)
 
+sizeBox = MakeNumberBox(
+  panel, "px", 6, 80,
+  function() return DB().size end,
+  function(v) DB().size = v end
+)
+
+sizeBox:SetPoint("LEFT", size, "RIGHT", 18, 0)
+
+-- update box if slider changes
+size:HookScript("OnValueChanged", function()
+  if sizeBox and sizeBox.Refresh then sizeBox:Refresh() end
+end)
+
 thickness = MakeSlider(
   panel, "Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.thickness) or FALLBACKS.thickness end,
@@ -283,12 +341,36 @@ offsetX = MakeSlider(
 )
 offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -42)
 
+offsetXBox = MakeNumberBox(
+  panel, "", -300, 300,
+  function() return DB().offsetX end,
+  function(v) DB().offsetX = v end
+)
+offsetXBox:SetPoint("LEFT", offsetX, "RIGHT", 18, 0)
+
+offsetX:HookScript("OnValueChanged", function()
+  if offsetXBox and offsetXBox.Refresh then offsetXBox:Refresh() end
+end)
+
+
 offsetY = MakeSlider(
   panel, "Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetY) or FALLBACKS.offsetY end,
   function(v) DB().offsetY = v end
 )
 offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -42)
+
+offsetYBox = MakeNumberBox(
+  panel, "", -300, 300,
+  function() return DB().offsetY end,
+  function(v) DB().offsetY = v end
+)
+offsetYBox:SetPoint("LEFT", offsetY, "RIGHT", 18, 0)
+
+offsetY:HookScript("OnValueChanged", function()
+  if offsetYBox and offsetYBox.Refresh then offsetYBox:Refresh() end
+end)
+
 
 -- Color button + swatch
 colorBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
@@ -358,9 +440,12 @@ panel:SetScript("OnShow", function()
 
   shape:Refresh()
   size:Refresh()
+  sizeBox:Refresh()
   thickness:Refresh()
   offsetX:Refresh()
+  offsetXBox:Refresh()
   offsetY:Refresh()
+  offsetYBox:Refresh()
 
   UpdateSwatch()
   UpdateControlState()
