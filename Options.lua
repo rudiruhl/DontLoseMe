@@ -153,7 +153,7 @@ local function RenderShape(t, db)
 
   local outlineOn = db.outlineEnabled and true or false
   local oT = Clamp(db.outlineThickness or FALLBACKS.outlineThickness, 1, 10)
-  local or_,og,ob,oa = db.or or 0, db.og or 0, db.ob or 0, db.oa or 1
+  local or_,og,ob,oa = db.or_ or 0, db.og or 0, db.ob or 0, db.oa or 1
 
   local shape = db.shape or FALLBACKS.shape
 
@@ -720,22 +720,22 @@ outlineSwatch:SetPoint("LEFT", outlineColorBtn, "RIGHT", 12, 0)
 
 local function UpdateOutlineSwatch()
   local db = DB()
-  outlineSwatch:SetColorTexture(db.or or 0, db.og or 0, db.ob or 0, db.oa or 1)
+  outlineSwatch:SetColorTexture(db.or_ or 0, db.og or 0, db.ob or 0, db.oa or 1)
 end
 
 outlineColorBtn:SetScript("OnClick", function()
   local db = DB()
   local info = {
-    r = db.or or FALLBACKS.or, g = db.og or FALLBACKS.og, b = db.ob or FALLBACKS.ob,
+    r = db.or_ or FALLBACKS.or_, g = db.og or FALLBACKS.og, b = db.ob or FALLBACKS.ob,
     hasOpacity = true,
     opacity = 1 - (db.oa or FALLBACKS.oa),
-    previousValues = { db.or or FALLBACKS.or, db.og or FALLBACKS.og, db.ob or FALLBACKS.ob, 1 - (db.oa or FALLBACKS.oa) },
+    previousValues = { db.or_ or FALLBACKS.or_, db.og or FALLBACKS.og, db.ob or FALLBACKS.ob, 1 - (db.oa or FALLBACKS.oa) },
   }
 
   info.swatchFunc = function()
     local r,g,b = ColorPickerFrame:GetColorRGB()
     local opacity = (OpacitySliderFrame and OpacitySliderFrame:GetValue()) or info.opacity or 0
-    db.or, db.og, db.ob, db.oa = r, g, b, (1 - opacity)
+    db.or_, db.og, db.ob, db.oa = r, g, b, (1 - opacity)
     UpdateOutlineSwatch()
     ns.RefreshAll()
     RenderShape(PT, db)
@@ -744,7 +744,7 @@ outlineColorBtn:SetScript("OnClick", function()
 
   info.cancelFunc = function(prev)
     if type(prev) == "table" then
-      db.or, db.og, db.ob = prev[1], prev[2], prev[3]
+      db.or_, db.og, db.ob = prev[1], prev[2], prev[3]
       db.oa = 1 - (prev[4] or 0)
       UpdateOutlineSwatch()
       ns.RefreshAll()
