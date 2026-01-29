@@ -191,7 +191,7 @@ local condAlways, condParty, condRaid, condCombat
 -- Shape + sliders references (needed for grey-out function)
 local shapeLabel, shape
 local size, thickness, offsetX, offsetY
-local sizeBox, offsetXBox, offsetYBox
+local sizeBox, offsetXBox, offsetYBox, thicknessBox
 local colorBtn, swatch
 
 local function UpdateSwatch()
@@ -207,6 +207,7 @@ local function UpdateControlState()
     size:Enable()
     sizeBox:Enable()
     thickness:Enable()
+    thicknessBox:Enable()
     offsetX:Enable()
     offsetXBox:Enable()
     offsetY:Enable()
@@ -218,6 +219,7 @@ local function UpdateControlState()
     size:Disable()
     sizeBox:Disable()
     thickness:Disable()
+    thicknessBox:Disable()
     offsetX:Disable()
     offsetXBox:Disable()
     offsetY:Disable()
@@ -334,6 +336,13 @@ thickness = MakeSlider(
 )
 thickness:SetPoint("TOPLEFT", size, "BOTTOMLEFT", 0, -42)
 
+thicknessBox = MakeNumberBox(
+  panel, "px", 1, 10,
+  function() return DB().thickness end,
+  function(v) DB().thickness = v end
+)
+thicknessBox:SetPoint("LEFT", thickness, "RIGHT", 18, 0)
+
 offsetX = MakeSlider(
   panel, "Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetX) or FALLBACKS.offsetX end,
@@ -442,6 +451,7 @@ panel:SetScript("OnShow", function()
   size:Refresh()
   sizeBox:Refresh()
   thickness:Refresh()
+  thicknessBox:Refresh()
   offsetX:Refresh()
   offsetXBox:Refresh()
   offsetY:Refresh()
