@@ -181,7 +181,7 @@ local function RenderShape(t, db)
     PlaceOutlined(t.o_xA, t.xA, 0, 0, size, thick, math.rad(45))
     PlaceOutlined(t.o_xB, t.xB, 0, 0, size, thick, math.rad(-45))
 
-  elseif shape == "CHEVRON_DD" or shape == "CHEVRON_DU" then
+  elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
     local angle = math.rad(35)
     local armLen = size
     local dx = armLen * 0.25
@@ -190,7 +190,7 @@ local function RenderShape(t, db)
     local yBot = -gap * 0.6
 
     local leftRot, rightRot
-    if shape == "CHEVRON_DD" then
+    if shape == "CHEVRON_DN" then
       leftRot, rightRot = angle, -angle
     else
       leftRot, rightRot = -angle, angle
