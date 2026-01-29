@@ -555,7 +555,7 @@ local BUTTON_GAP  = 28
 
 -- Size
 size = MakeSlider(
-  content, "Size", 6, 80, 1,
+  content, "Shape Size", 6, 80, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.size) or FALLBACKS.size end,
   function(v) DB().size = v end
 )
@@ -574,7 +574,7 @@ end)
 
 -- Thickness
 thickness = MakeSlider(
-  content, "Thickness", 1, 10, 1,
+  content, "Shape Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.thickness) or FALLBACKS.thickness end,
   function(v) DB().thickness = v end
 )
@@ -593,7 +593,7 @@ end)
 
 -- Offset X
 offsetX = MakeSlider(
-  content, "Offset X", -300, 300, 1,
+  content, "Shape Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetX) or FALLBACKS.offsetX end,
   function(v) DB().offsetX = v end
 )
@@ -612,7 +612,7 @@ end)
 
 -- Offset Y
 offsetY = MakeSlider(
-  content, "Offset Y", -300, 300, 1,
+  content, "Shape Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetY) or FALLBACKS.offsetY end,
   function(v) DB().offsetY = v end
 )
