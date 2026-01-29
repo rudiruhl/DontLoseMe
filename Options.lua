@@ -298,18 +298,18 @@ conditionsBtn = CreateFrame("Button", nil, content)
 conditionsBtn:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -12)
 conditionsBtn:SetSize(260, 20)
 
-conditionsHeader = MakeLabel(conditionsBtn, "Conditions", "LEFT", conditionsBtn, "LEFT", 22, 0, "GameFontNormal")
+conditionsHeader = MakeLabel(conditionsBtn, "Conditions", "LEFT", conditionsBtn, "LEFT", 28, 0, "GameFontNormal")
 
 conditionsArrow = conditionsBtn:CreateTexture(nil, "ARTWORK")
-conditionsArrow:SetSize(18, 18)
-conditionsArrow:SetPoint("LEFT", conditionsBtn, "LEFT", 2, 0)
+conditionsArrow:SetSize(24, 24)
+conditionsArrow:SetPoint("LEFT", conditionsBtn, "LEFT", 4, 0)
 conditionsArrow:SetTexture("Interface/Buttons/UI-SpellbookIcon-NextPage-Up")
 
 -- This frame is ONLY used as a layout anchor for what comes next.
 conditionsSpacer = CreateFrame("Frame", nil, content)
 conditionsSpacer:SetPoint("TOPLEFT", conditionsBtn, "BOTTOMLEFT", 0, -4)
 conditionsSpacer:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
-conditionsSpacer:SetHeight(1)
+conditionsSpacer:SetHeight(10)
 
 -- The actual container that holds the checkboxes.
 conditionsGroup = CreateFrame("Frame", nil, content)
@@ -349,7 +349,7 @@ local function RefreshConditionsCollapse()
 
   if collapsed then
     conditionsGroup:Hide()
-    conditionsSpacer:SetHeight(0)
+    conditionsSpacer:SetHeight(10)
     conditionsArrow:SetRotation(0) -- right
   else
     conditionsGroup:Show()
