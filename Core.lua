@@ -1,6 +1,9 @@
 -- DontLoseMe - Core.lua
 local ADDON, ns = ...
 
+-- -------------------------------------------------------------------
+-- Default settings
+-- -------------------------------------------------------------------
 local defaults = {
   enabled = true,
 
@@ -28,6 +31,9 @@ local defaults = {
   or_ = 0, og = 0, ob = 0, oa = 1,
 }
 
+-- -------------------------------------------------------------------
+-- Database handling
+-- -------------------------------------------------------------------  
 local function CopyDefaults(src, dst)
   if type(dst) ~= "table" then dst = {} end
   for k, v in pairs(src) do
@@ -40,10 +46,9 @@ local function CopyDefaults(src, dst)
   return dst
 end
 
--- DB must exist immediately
 DontLoseMeDB = CopyDefaults(defaults, DontLoseMeDB or {})
 
--- Migration from old single mode field
+-- Migrate old single-mode setting to new multi-condition settings
 if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.conditions) ~= "table") then
   DontLoseMeDB.conditions = {
     always = DontLoseMeDB.mode == "ALWAYS",
@@ -54,7 +59,7 @@ if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.condi
   DontLoseMeDB.mode = nil
 end
 
--- Ensure conditions keys exist
+-- Ensure all condition fields exists
 do
   local c = DontLoseMeDB.conditions
   if type(c) ~= "table" then
@@ -76,14 +81,16 @@ Root:SetFrameLevel(10)
 Root:EnableMouse(false)
 Root:SetClampedToScreen(true)
 
--- Helper to create a bar texture
+-- -------------------------------------------------------------------
+-- Shape textures
+-- -------------------------------------------------------------------
 local function NewBar(layer)
   local t = Root:CreateTexture(nil, layer or "OVERLAY")
   t:SetColorTexture(1, 1, 1, 1)
   return t
 end
 
--- Outline bars (BACKGROUND) - drawn behind the main bars
+-- Outline bars (BACKGROUND)
 local o_plusH = NewBar("BACKGROUND")
 local o_plusV = NewBar("BACKGROUND")
 local o_xA    = NewBar("BACKGROUND")
@@ -220,7 +227,7 @@ local function ApplyLayout()
 end
 
 -- -------------------------------------------------------------------
--- Visibility logic based on conditions (multi-select)
+-- Visibility handling
 -- -------------------------------------------------------------------
 local function AnyContextSelected(c)
   return (c.always or c.party or c.raid) and true or false
@@ -267,7 +274,9 @@ function ns.RefreshAll()
   RefreshVisibility()
 end
 
--- Refresh on relevant events
+-- -------------------------------------------------------------------
+-- Event handling
+-- -------------------------------------------------------------------
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 ev:RegisterEvent("GROUP_ROSTER_UPDATE")
