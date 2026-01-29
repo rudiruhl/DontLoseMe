@@ -9,8 +9,8 @@ local defaults = {
 
   conditions = {
     always = true,
-    party = false,
-    raid = false,
+    party  = false,
+    raid   = false,
     combat = false,
   },
 
@@ -28,12 +28,12 @@ local defaults = {
   -- Outline
   outlineEnabled = false,
   outlineThickness = 2,
-  or_ = 0, og = 0, ob = 0, oa = 1,
+  outlineR = 0, outlineG = 0, outlineB = 0, outlineA = 1,
 }
 
 -- -------------------------------------------------------------------
 -- Database handling
--- -------------------------------------------------------------------  
+-- -------------------------------------------------------------------
 local function CopyDefaults(src, dst)
   if type(dst) ~= "table" then dst = {} end
   for k, v in pairs(src) do
@@ -46,9 +46,10 @@ local function CopyDefaults(src, dst)
   return dst
 end
 
+-- DB must exist immediately
 DontLoseMeDB = CopyDefaults(defaults, DontLoseMeDB or {})
 
--- Migrate old single-mode setting to new multi-condition settings
+-- Migration: old single-mode -> conditions table
 if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.conditions) ~= "table") then
   DontLoseMeDB.conditions = {
     always = DontLoseMeDB.mode == "ALWAYS",
@@ -59,7 +60,16 @@ if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.condi
   DontLoseMeDB.mode = nil
 end
 
--- Ensure all condition fields exists
+-- Migration: old outline keys (or_/og/ob/oa) -> outlineR/G/B/A
+if DontLoseMeDB.or_ ~= nil or DontLoseMeDB.og ~= nil or DontLoseMeDB.ob ~= nil or DontLoseMeDB.oa ~= nil then
+  if DontLoseMeDB.outlineR == nil and DontLoseMeDB.or_ ~= nil then DontLoseMeDB.outlineR = DontLoseMeDB.or_ end
+  if DontLoseMeDB.outlineG == nil and DontLoseMeDB.og ~= nil then DontLoseMeDB.outlineG = DontLoseMeDB.og end
+  if DontLoseMeDB.outlineB == nil and DontLoseMeDB.ob ~= nil then DontLoseMeDB.outlineB = DontLoseMeDB.ob end
+  if DontLoseMeDB.outlineA == nil and DontLoseMeDB.oa ~= nil then DontLoseMeDB.outlineA = DontLoseMeDB.oa end
+  DontLoseMeDB.or_, DontLoseMeDB.og, DontLoseMeDB.ob, DontLoseMeDB.oa = nil, nil, nil, nil
+end
+
+-- Ensure all condition fields exist
 do
   local c = DontLoseMeDB.conditions
   if type(c) ~= "table" then
@@ -90,60 +100,55 @@ local function NewBar(layer)
   return t
 end
 
--- Outline bars (BACKGROUND)
-local o_plusH = NewBar("BACKGROUND")
-local o_plusV = NewBar("BACKGROUND")
-local o_xA    = NewBar("BACKGROUND")
-local o_xB    = NewBar("BACKGROUND")
-local o_ch1A  = NewBar("BACKGROUND")
-local o_ch1B  = NewBar("BACKGROUND")
-local o_ch2A  = NewBar("BACKGROUND")
-local o_ch2B  = NewBar("BACKGROUND")
+-- Store all bars in one table so we can hide/apply colors easily
+local T = {
+  -- Outline (BACKGROUND)
+  o_plusH = NewBar("BACKGROUND"),
+  o_plusV = NewBar("BACKGROUND"),
+  o_xA    = NewBar("BACKGROUND"),
+  o_xB    = NewBar("BACKGROUND"),
+  o_ch1A  = NewBar("BACKGROUND"),
+  o_ch1B  = NewBar("BACKGROUND"),
+  o_ch2A  = NewBar("BACKGROUND"),
+  o_ch2B  = NewBar("BACKGROUND"),
 
--- Main bars (OVERLAY)
-local plusH = NewBar("OVERLAY")
-local plusV = NewBar("OVERLAY")
-local xA    = NewBar("OVERLAY")
-local xB    = NewBar("OVERLAY")
-local ch1A  = NewBar("OVERLAY")
-local ch1B  = NewBar("OVERLAY")
-local ch2A  = NewBar("OVERLAY")
-local ch2B  = NewBar("OVERLAY")
+  -- Main (OVERLAY)
+  plusH = NewBar("OVERLAY"),
+  plusV = NewBar("OVERLAY"),
+  xA    = NewBar("OVERLAY"),
+  xB    = NewBar("OVERLAY"),
+  ch1A  = NewBar("OVERLAY"),
+  ch1B  = NewBar("OVERLAY"),
+  ch2A  = NewBar("OVERLAY"),
+  ch2B  = NewBar("OVERLAY"),
+}
 
 local function HideAllShapes()
-  -- Outline
-  o_plusH:Hide(); o_plusV:Hide()
-  o_xA:Hide(); o_xB:Hide()
-  o_ch1A:Hide(); o_ch1B:Hide()
-  o_ch2A:Hide(); o_ch2B:Hide()
-
-  -- Main
-  plusH:Hide(); plusV:Hide()
-  xA:Hide(); xB:Hide()
-  ch1A:Hide(); ch1B:Hide()
-  ch2A:Hide(); ch2B:Hide()
+  for _, tex in pairs(T) do
+    tex:Hide()
+  end
 end
 
 local function ApplyColors(mainR, mainG, mainB, mainA, outR, outG, outB, outA)
   -- Main
-  plusH:SetColorTexture(mainR, mainG, mainB, mainA)
-  plusV:SetColorTexture(mainR, mainG, mainB, mainA)
-  xA:SetColorTexture(mainR, mainG, mainB, mainA)
-  xB:SetColorTexture(mainR, mainG, mainB, mainA)
-  ch1A:SetColorTexture(mainR, mainG, mainB, mainA)
-  ch1B:SetColorTexture(mainR, mainG, mainB, mainA)
-  ch2A:SetColorTexture(mainR, mainG, mainB, mainA)
-  ch2B:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.plusH:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.plusV:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.xA:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.xB:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.ch1A:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.ch1B:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.ch2A:SetColorTexture(mainR, mainG, mainB, mainA)
+  T.ch2B:SetColorTexture(mainR, mainG, mainB, mainA)
 
   -- Outline
-  o_plusH:SetColorTexture(outR, outG, outB, outA)
-  o_plusV:SetColorTexture(outR, outG, outB, outA)
-  o_xA:SetColorTexture(outR, outG, outB, outA)
-  o_xB:SetColorTexture(outR, outG, outB, outA)
-  o_ch1A:SetColorTexture(outR, outG, outB, outA)
-  o_ch1B:SetColorTexture(outR, outG, outB, outA)
-  o_ch2A:SetColorTexture(outR, outG, outB, outA)
-  o_ch2B:SetColorTexture(outR, outG, outB, outA)
+  T.o_plusH:SetColorTexture(outR, outG, outB, outA)
+  T.o_plusV:SetColorTexture(outR, outG, outB, outA)
+  T.o_xA:SetColorTexture(outR, outG, outB, outA)
+  T.o_xB:SetColorTexture(outR, outG, outB, outA)
+  T.o_ch1A:SetColorTexture(outR, outG, outB, outA)
+  T.o_ch1B:SetColorTexture(outR, outG, outB, outA)
+  T.o_ch2A:SetColorTexture(outR, outG, outB, outA)
+  T.o_ch2B:SetColorTexture(outR, outG, outB, outA)
 end
 
 local function PlaceBar(tex, cx, cy, w, h, rot)
@@ -164,12 +169,14 @@ local function PlaceOutlined(outTex, mainTex, cx, cy, w, h, rot, outlineOn, outl
 end
 
 local function PlaceV(outA, outB, texA, texB, y, armLen, thickness, leftRot, rightRot, outlineOn, outlineThickness)
-  local dx = armLen * 0.35 -- horizontal offset
-
-  PlaceOutlined(outA, texA, -dx, y, armLen, thickness, leftRot, outlineOn, outlineThickness)
+  local dx = armLen * 0.35
+  PlaceOutlined(outA, texA, -dx, y, armLen, thickness, leftRot,  outlineOn, outlineThickness)
   PlaceOutlined(outB, texB,  dx, y, armLen, thickness, rightRot, outlineOn, outlineThickness)
 end
 
+-- -------------------------------------------------------------------
+-- Layout
+-- -------------------------------------------------------------------
 local function ApplyLayout()
   local db = DontLoseMeDB
   if not db then return end
@@ -177,32 +184,41 @@ local function ApplyLayout()
   Root:ClearAllPoints()
   Root:SetPoint("CENTER", UIParent, "CENTER", db.offsetX or 0, db.offsetY or 0)
 
-  local size = tonumber(db.size) or defaults.size
-  local t = tonumber(db.thickness) or defaults.thickness
+  local size  = tonumber(db.size) or defaults.size
+  local thick = tonumber(db.thickness) or defaults.thickness
   local shape = db.shape or defaults.shape
 
-  Root:SetSize(size, size)
-
+  -- Main color
   local r, g, b, a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
 
+  -- Outline settings
   local outlineOn = db.outlineEnabled and true or false
   local oT = tonumber(db.outlineThickness) or defaults.outlineThickness
   if oT < 1 then oT = 1 end
   if oT > 10 then oT = 10 end
 
-  local or_, og, ob, oa = db.or_ or defaults.or_, db.og or defaults.og, db.ob or defaults.ob, db.oa or defaults.oa
-  ApplyColors(r, g, b, a, or_, og, ob, oa)
+  local outR = db.outlineR
+  local outG = db.outlineG
+  local outB = db.outlineB
+  local outA = db.outlineA
+  if outR == nil then outR = defaults.outlineR end
+  if outG == nil then outG = defaults.outlineG end
+  if outB == nil then outB = defaults.outlineB end
+  if outA == nil then outA = defaults.outlineA end
+
+  Root:SetSize(size, size)
+  ApplyColors(r, g, b, a, outR, outG, outB, outA)
 
   HideAllShapes()
 
   if shape == "X" then
-    PlaceOutlined(o_xA, xA, 0, 0, size, t, math.rad(45),  outlineOn, oT)
-    PlaceOutlined(o_xB, xB, 0, 0, size, t, math.rad(-45), outlineOn, oT)
+    PlaceOutlined(T.o_xA, T.xA, 0, 0, size, thick, math.rad(45),  outlineOn, oT)
+    PlaceOutlined(T.o_xB, T.xB, 0, 0, size, thick, math.rad(-45), outlineOn, oT)
 
   elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
     local angle = math.rad(35)
     local armLen = size
-    local gap = math.max(2, t * 2)
+    local gap = math.max(2, thick * 2)
 
     local yTop = gap * 0.6
     local yBot = -gap * 0.6
@@ -216,13 +232,13 @@ local function ApplyLayout()
       rightRot = -angle
     end
 
-    PlaceV(o_ch1A, o_ch1B, ch1A, ch1B, yTop, armLen, t, leftRot, rightRot, outlineOn, oT)
-    PlaceV(o_ch2A, o_ch2B, ch2A, ch2B, yBot, armLen, t, leftRot, rightRot, outlineOn, oT)
+    PlaceV(T.o_ch1A, T.o_ch1B, T.ch1A, T.ch1B, yTop, armLen, thick, leftRot, rightRot, outlineOn, oT)
+    PlaceV(T.o_ch2A, T.o_ch2B, T.ch2A, T.ch2B, yBot, armLen, thick, leftRot, rightRot, outlineOn, oT)
 
   else
     -- PLUS default
-    PlaceOutlined(o_plusH, plusH, 0, 0, size, t, 0, outlineOn, oT)
-    PlaceOutlined(o_plusV, plusV, 0, 0, t, size, 0, outlineOn, oT)
+    PlaceOutlined(T.o_plusH, T.plusH, 0, 0, size, thick, 0, outlineOn, oT)
+    PlaceOutlined(T.o_plusV, T.plusV, 0, 0, thick, size, 0, outlineOn, oT)
   end
 end
 
