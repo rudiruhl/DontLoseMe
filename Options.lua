@@ -55,11 +55,14 @@ local function EnsureOutline()
   if db.outlineEnabled == nil then db.outlineEnabled = FALLBACKS.outlineEnabled end
   if db.outlineThickness == nil then db.outlineThickness = FALLBACKS.outlineThickness end
   if db.outlineR == nil then db.outlineR = FALLBACKS.outlineR end
-  if db.og == nil then db.og = FALLBACKS.og end
-  if db.ob == nil then db.ob = FALLBACKS.ob end
-  if db.oa == nil then db.oa = FALLBACKS.oa end
+  if db.outlineG == nil then db.outlineG = FALLBACKS.outlineG end
+  if db.outlineB == nil then db.outlineB = FALLBACKS.outlineB end
+  if db.outlineA == nil then db.outlineA = FALLBACKS.outlineA end
 end
 
+-- -------------------------------------------------------------------
+-- Utility functions
+-- -------------------------------------------------------------------
 local function Clamp(v, minv, maxv)
   v = tonumber(v) or minv
   if v < minv then return minv end
@@ -156,7 +159,11 @@ local function RenderShape(t, db)
 
   local outlineOn = db.outlineEnabled and true or false
   local oT = Clamp(db.outlineThickness or FALLBACKS.outlineThickness, 1, 10)
-  local or_,og,ob,oa = db.or_ or 0, db.og or 0, db.ob or 0, db.oa or 1
+  local or_, og, ob, oa =
+  db.outlineR or FALLBACKS.outlineR,
+  db.outlineG or FALLBACKS.outlineG,
+  db.outlineB or FALLBACKS.outlineB,
+  db.outlineA or FALLBACKS.outlineA
 
   local shape = db.shape or FALLBACKS.shape
 
@@ -723,32 +730,56 @@ outlineSwatch:SetPoint("LEFT", outlineColorBtn, "RIGHT", 12, 0)
 
 local function UpdateOutlineSwatch()
   local db = DB()
-  outlineSwatch:SetColorTexture(db.or_ or 0, db.og or 0, db.ob or 0, db.oa or 1)
+  outlineSwatch:SetColorTexture(
+    db.outlineR or FALLBACKS.outlineR,
+    db.outlineG or FALLBACKS.outlineG,
+    db.outlineB or FALLBACKS.outlineB,
+    db.outlineA or FALLBACKS.outlineA
+  )
 end
 
 outlineColorBtn:SetScript("OnClick", function()
   local db = DB()
+
   local info = {
-    r = db.or_ or FALLBACKS.or_, g = db.og or FALLBACKS.og, b = db.ob or FALLBACKS.ob,
+    r = db.outlineR or FALLBACKS.outlineR,
+    g = db.outlineG or FALLBACKS.outlineG,
+    b = db.outlineB or FALLBACKS.outlineB,
+
     hasOpacity = true,
-    opacity = 1 - (db.oa or FALLBACKS.oa),
-    previousValues = { db.or_ or FALLBACKS.or_, db.og or FALLBACKS.og, db.ob or FALLBACKS.ob, 1 - (db.oa or FALLBACKS.oa) },
+    opacity = 1 - (db.outlineA or FALLBACKS.outlineA),
+
+    previousValues = {
+      db.outlineR or FALLBACKS.outlineR,
+      db.outlineG or FALLBACKS.outlineG,
+      db.outlineB or FALLBACKS.outlineB,
+      1 - (db.outlineA or FALLBACKS.outlineA),
+    },
   }
 
   info.swatchFunc = function()
-    local r,g,b = ColorPickerFrame:GetColorRGB()
+    local r, g, b = ColorPickerFrame:GetColorRGB()
     local opacity = (OpacitySliderFrame and OpacitySliderFrame:GetValue()) or info.opacity or 0
-    db.or_, db.og, db.ob, db.oa = r, g, b, (1 - opacity)
+
+    db.outlineR = r
+    db.outlineG = g
+    db.outlineB = b
+    db.outlineA = 1 - opacity
+
     UpdateOutlineSwatch()
     ns.RefreshAll()
     RenderShape(PT, db)
   end
+
   info.opacityFunc = info.swatchFunc
 
   info.cancelFunc = function(prev)
     if type(prev) == "table" then
-      db.or_, db.og, db.ob = prev[1], prev[2], prev[3]
-      db.oa = 1 - (prev[4] or 0)
+      db.outlineR = prev[1]
+      db.outlineG = prev[2]
+      db.outlineB = prev[3]
+      db.outlineA = 1 - (prev[4] or 0)
+
       UpdateOutlineSwatch()
       ns.RefreshAll()
       RenderShape(PT, db)
@@ -757,6 +788,7 @@ outlineColorBtn:SetScript("OnClick", function()
 
   ColorPickerFrame:SetupColorPickerAndShow(info)
 end)
+
 
 
 -- Set content size so scrollbar knows how far it can scroll
