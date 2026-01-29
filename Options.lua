@@ -351,7 +351,7 @@ offsetX = MakeSlider(
 offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -42)
 
 offsetXBox = MakeNumberBox(
-  panel, "", -300, 300,
+  panel, "px", -300, 300,
   function() return DB().offsetX end,
   function(v) DB().offsetX = v end
 )
@@ -370,7 +370,7 @@ offsetY = MakeSlider(
 offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -42)
 
 offsetYBox = MakeNumberBox(
-  panel, "", -300, 300,
+  panel, "px", -300, 300,
   function() return DB().offsetY end,
   function(v) DB().offsetY = v end
 )
