@@ -110,7 +110,7 @@ end
 
 local function PlaceV(texA, texB, y, armLen, thickness, leftRot, rightRot)
 
-  local dx = armLen * 0.35
+  local dx = armLen * 0.35 -- horizontal offset
 
   texA:ClearAllPoints()
   texA:SetPoint("CENTER", Root, "CENTER", -dx, y)
