@@ -337,8 +337,8 @@ local function RenderPreview(parent, t)
     local angle = math.rad(35)
     local armLen = size
     local gap = math.max(6, size * 0.6)  -- Scale gap with size to prevent crossing
-    local yTop = gap * 0.6
-    local yBot = -gap * 0.6
+    local yTop = gap
+    local yBot = -gap
 
     local leftRot, rightRot
     if shape == "CHEVRON_DN" then
