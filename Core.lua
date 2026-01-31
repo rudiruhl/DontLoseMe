@@ -206,7 +206,7 @@ local function PlaceOutlined(outTex, mainTex, cx, cy, w, h, rot, outlineOn, outl
 end
 
 local function PlaceV(outA, outB, texA, texB, y, armLen, thickness, leftRot, rightRot, outlineOn, outlineThickness)
-  local dx = armLen * 0.35
+  local dx = armLen * 0.38
   PlaceOutlined(outA, texA, -dx, y, armLen, thickness, leftRot,  outlineOn, outlineThickness)
   PlaceOutlined(outB, texB,  dx, y, armLen, thickness, rightRot, outlineOn, outlineThickness)
 end
@@ -255,7 +255,7 @@ local function ApplyLayout()
   elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
     local angle = math.rad(35)
     local armLen = size
-    local gap = math.max(6, size * 0.6)  -- Scale gap with size to prevent crossing
+    local gap = math.max(4, size * 0.3)  -- Scale gap with size to prevent crossing
 
     local yTop = gap
     local yBot = -gap

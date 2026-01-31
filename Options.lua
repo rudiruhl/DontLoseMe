@@ -279,7 +279,7 @@ local function PlaceOutlinedP(outTex, mainTex, parent, cx, cy, w, h, rot, outlin
 end
 
 local function PlaceVP(outA, outB, texA, texB, parent, y, armLen, thick, leftRot, rightRot, outlineOn, oThick)
-  local dx = armLen * 0.35
+  local dx = armLen * 0.38
   PlaceOutlinedP(outA, texA, parent, -dx, y, armLen, thick, leftRot,  outlineOn, oThick)
   PlaceOutlinedP(outB, texB, parent,  dx, y, armLen, thick, rightRot, outlineOn, oThick)
 end
@@ -336,7 +336,7 @@ local function RenderPreview(parent, t)
   elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
     local angle = math.rad(35)
     local armLen = size
-    local gap = math.max(6, size * 0.6)  -- Scale gap with size to prevent crossing
+    local gap = math.max(4, size * 0.3)  -- Scale gap with size to prevent crossing
     local yTop = gap
     local yBot = -gap
 
