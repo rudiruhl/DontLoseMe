@@ -552,7 +552,7 @@ thickness = MakeSlider(content, "Shape Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DB().thickness) or FALLBACKS.thickness end,
   function(v) DB().thickness = v end
 )
-thickness:SetPoint("TOPLEFT", size, "BOTTOMLEFT", 0, -SECTION_GAP)
+thickness:SetPoint("TOPLEFT", size, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 thickness:SetWidth(SLIDER_W)
 
 thicknessBox, thicknessBoxLbl = MakeNumberBox(content, "px", 1, 10,
@@ -566,7 +566,7 @@ offsetX = MakeSlider(content, "Shape Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetX) or FALLBACKS.offsetX end,
   function(v) DB().offsetX = v end
 )
-offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -SECTION_GAP)
+offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 offsetX:SetWidth(SLIDER_W)
 
 offsetXBox, offsetXBoxLbl = MakeNumberBox(content, "px", -300, 300,
@@ -580,7 +580,7 @@ offsetY = MakeSlider(content, "Shape Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetY) or FALLBACKS.offsetY end,
   function(v) DB().offsetY = v end
 )
-offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -SECTION_GAP)
+offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 offsetY:SetWidth(SLIDER_W)
 
 offsetYBox, offsetYBoxLbl = MakeNumberBox(content, "px", -300, 300,
@@ -595,7 +595,7 @@ offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 -- -------------------------------------------------------------------
 local colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 colorBtn:SetSize(160, 24)
-colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP))
+colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 colorBtn:SetText("Set Color...")
 
 local swatch = content:CreateTexture(nil, "ARTWORK")
@@ -746,8 +746,8 @@ outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
--- Anchor to the slider with consistent spacing
-outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP))
+-- Anchor to the slider with spacing for number box + section gap
+outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
