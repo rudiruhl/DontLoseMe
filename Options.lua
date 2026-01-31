@@ -287,6 +287,7 @@ local SLIDER_W    = 200
 -- Preview renderer (created AFTER preview exists)
 -- -------------------------------------------------------------------
 local function PlaceBar(tex, cx, cy, w, h, rot)
+  if not previewRoot then return end
   tex:ClearAllPoints()
   tex:SetPoint("CENTER", previewRoot, "CENTER", cx, cy)
   tex:SetSize(w, h)
@@ -295,7 +296,7 @@ local function PlaceBar(tex, cx, cy, w, h, rot)
 end
 
 local function RenderShape(t, db)
-  if not t or not db then return end
+  if not t or not db or not previewRoot then return end
   HideAll(t)
 
   local sizePx = Clamp(db.size or FALLBACKS.size, 6, 80)
@@ -356,9 +357,7 @@ local function RenderShape(t, db)
 end
 
 local function RefreshPreview()
-  if PT then
-    RenderShape(PT, DB())
-  end
+  if PT then RenderShape(PT, DB()) end
 end
 
 -- -------------------------------------------------------------------
@@ -366,9 +365,7 @@ end
 -- -------------------------------------------------------------------
 local function UpdateSwatch()
   local db = DB()
-  if swatch then
-    swatch:SetColorTexture(db.r or 1, db.g or 1, db.b or 1, db.a or 1)
-  end
+  if swatch then swatch:SetColorTexture(db.r or 1, db.g or 1, db.b or 1, db.a or 1) end
 end
 
 local function UpdateOutlineSwatch()
@@ -402,13 +399,14 @@ local function UpdateControlState()
   SetEnabled(colorBtn)
 
   if swatch then swatch:SetAlpha(enabledState and 1 or 0.3) end
+
   local a = enabledState and 1 or 0.4
   if sizeBoxLbl then sizeBoxLbl:SetAlpha(a) end
   if thicknessBoxLbl then thicknessBoxLbl:SetAlpha(a) end
   if offsetXBoxLbl then offsetXBoxLbl:SetAlpha(a) end
   if offsetYBoxLbl then offsetYBoxLbl:SetAlpha(a) end
 
-  local outlineOn = DB().outlineEnabled and true or false
+  local outlineOn = enabledState and (DB().outlineEnabled and true or false)
   if outlineThickness then if outlineOn then outlineThickness:Enable() else outlineThickness:Disable() end end
   if outlineThicknessBox then if outlineOn then outlineThicknessBox:Enable() else outlineThicknessBox:Disable() end end
   if outlineColorBtn then if outlineOn then outlineColorBtn:Enable() else outlineColorBtn:Disable() end end
@@ -528,7 +526,7 @@ end)
 RefreshConditionsCollapse()
 
 -- -------------------------------------------------------------------
--- Shape dropdown + Preview box
+-- Shape dropdown + Preview box (FIXED: preview is next to controls)
 -- -------------------------------------------------------------------
 shapeLabel = MakeLabel(content, "Shape", "TOPLEFT", conditionsSpacer, "BOTTOMLEFT", 2, -14, "GameFontNormal")
 
@@ -545,7 +543,6 @@ shape = MakeDropdown(
 )
 shape:SetPoint("TOPLEFT", shapeLabel, "BOTTOMLEFT", -16, -6)
 
--- Preview box (right side) - fixed anchor
 preview = CreateFrame("Frame", nil, content, "BackdropTemplate")
 preview:SetBackdrop({
   bgFile = "Interface/ChatFrame/ChatFrameBackground",
@@ -555,13 +552,12 @@ preview:SetBackdrop({
 })
 preview:SetBackdropColor(0, 0, 0, 0.35)
 
+preview:SetSize(260, 260)
 preview:ClearAllPoints()
-preview:SetPoint("TOPRIGHT", content, "TOPRIGHT", -40, -160)
-preview:SetSize(260, 320)
+preview:SetPoint("TOPLEFT", shape, "TOPRIGHT", 40, -6)
 
 local previewTitle = MakeLabel(content, "Preview", "BOTTOMLEFT", preview, "TOPLEFT", 6, 6, "GameFontNormal")
 
--- Now that preview exists, create preview textures
 previewRoot = CreateFrame("Frame", nil, preview)
 previewRoot:SetPoint("CENTER", preview, "CENTER", 0, 0)
 previewRoot:SetSize(1, 1)
@@ -688,7 +684,7 @@ colorBtn:SetScript("OnClick", function()
 end)
 
 -- -------------------------------------------------------------------
--- Outline controls
+-- Outline controls (FIXED: button enable + swatch + preview updates)
 -- -------------------------------------------------------------------
 outlineEnabled = MakeCheckbox(
   content,
@@ -699,6 +695,7 @@ outlineEnabled = MakeCheckbox(
     DB().outlineEnabled = v and true or false
     UpdateControlState()
     ns.RefreshAll()
+    RefreshPreview()
   end
 )
 outlineEnabled:SetPoint("TOPLEFT", colorBtn, "BOTTOMLEFT", 0, -16)
@@ -726,7 +723,7 @@ outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
-outlineColorBtn:SetPoint("TOPLEFT", outlineThicknessBox, "BOTTOMLEFT", -2, -18)
+outlineColorBtn:SetPoint("TOPLEFT", outlineThicknessBox, "BOTTOMLEFT", 0, -18)
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
@@ -784,7 +781,6 @@ end)
 -- Scroll height calculation
 -- -------------------------------------------------------------------
 UpdateScrollHeight = function()
-  -- choose last element that exists
   local last = outlineColorBtn or colorBtn
   local bottom = last and last:GetBottom()
   local top = header and header:GetTop()
