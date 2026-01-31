@@ -1,0 +1,9 @@
+package-as: DontLoseMe
+
+ignore:
+  - .git
+  - .gitignore
+  - .github
+  - CLAUDE.md
+  - screenshots
+  - .pkgmeta
