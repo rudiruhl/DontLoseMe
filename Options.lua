@@ -136,6 +136,12 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
   s:SetScript("OnValueChanged", function(self, value)
     value = Clamp(value, minv, maxv)
     set(value)
+
+    -- Update linked number box if it exists
+    if s.linkedNumberBox and s.linkedNumberBox.Refresh then
+      s.linkedNumberBox.Refresh()
+    end
+
     ns.RefreshAll()
     if RefreshPreview then RefreshPreview() end
   end)
@@ -555,6 +561,7 @@ sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 8, 60,
   size
 )
 sizeBox:SetPoint("TOP", size, "BOTTOM", 0, -BOX_GAP)
+size.linkedNumberBox = sizeBox
 
 thickness = MakeSlider(content, "Shape Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DB().thickness) or FALLBACKS.thickness end,
@@ -569,6 +576,7 @@ thicknessBox, thicknessBoxLbl = MakeNumberBox(content, "px", 1, 10,
   thickness
 )
 thicknessBox:SetPoint("TOP", thickness, "BOTTOM", 0, -BOX_GAP)
+thickness.linkedNumberBox = thicknessBox
 
 offsetX = MakeSlider(content, "Shape Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetX) or FALLBACKS.offsetX end,
@@ -583,6 +591,7 @@ offsetXBox, offsetXBoxLbl = MakeNumberBox(content, "px", -300, 300,
   offsetX
 )
 offsetXBox:SetPoint("TOP", offsetX, "BOTTOM", 0, -BOX_GAP)
+offsetX.linkedNumberBox = offsetXBox
 
 offsetY = MakeSlider(content, "Shape Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetY) or FALLBACKS.offsetY end,
@@ -597,6 +606,7 @@ offsetYBox, offsetYBoxLbl = MakeNumberBox(content, "px", -300, 300,
   offsetY
 )
 offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
+offsetY.linkedNumberBox = offsetYBox
 
 -- -------------------------------------------------------------------
 -- Color pickers
@@ -749,6 +759,7 @@ outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(content, "px", 1, 10,
   outlineThickness
 )
 outlineThicknessBox:SetPoint("TOP", outlineThickness, "BOTTOM", 0, -BOX_GAP)
+outlineThickness.linkedNumberBox = outlineThicknessBox
 
 outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
