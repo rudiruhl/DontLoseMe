@@ -400,6 +400,7 @@ previewFrame:SetBackdrop({
 local previewLabel = MakeLabel(previewFrame, "Preview", "BOTTOM", 0, -20, "GameFontNormalSmall")
 
 local previewTextures = CreateShapeTextures(previewFrame)
+previewFrame:Show()
 
 RefreshPreview = function()
   RenderPreview(previewFrame, previewTextures)
