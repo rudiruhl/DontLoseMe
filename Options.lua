@@ -70,6 +70,10 @@ local function Clamp(v, minv, maxv)
   return v
 end
 
+-- Forward declarations (needed because helpers call these)
+local RefreshPreview
+local UpdateControlState
+
 -- -------------------------------------------------------------------
 -- UI helpers
 -- -------------------------------------------------------------------
@@ -91,6 +95,8 @@ local function MakeCheckbox(parent, label, tooltip, get, set)
   cb:SetScript("OnClick", function(self)
     set(self:GetChecked() and true or false)
     ns.RefreshAll()
+    if RefreshPreview then RefreshPreview() end
+    if UpdateControlState then UpdateControlState() end
   end)
   cb.Refresh = function()
     cb:SetChecked(get() and true or false)
@@ -111,6 +117,7 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
     value = Clamp(value, minv, maxv)
     set(value)
     ns.RefreshAll()
+    if RefreshPreview then RefreshPreview() end
   end)
 
   s.Refresh = function()
@@ -119,7 +126,8 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
   return s
 end
 
-local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc)
+-- Number box: keeps slider + preview in sync when user types
+local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc, linkedSlider)
   local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
   eb:SetAutoFocus(false)
   eb:SetSize(60, 20)
@@ -140,7 +148,16 @@ local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc)
     value = Clamp(value, minv, maxv)
     setFunc(value)
     eb:SetText(tostring(value))
+
+    -- keep slider in sync (prevents preview desync)
+    if linkedSlider and linkedSlider.SetValue then
+      if linkedSlider:GetValue() ~= value then
+        linkedSlider:SetValue(value)
+      end
+    end
+
     ns.RefreshAll()
+    if RefreshPreview then RefreshPreview() end
   end
 
   eb:SetScript("OnEnterPressed", function(self)
@@ -172,6 +189,7 @@ local function MakeDropdown(parent, items, get, set)
         set(it.value)
         UIDropDownMenu_SetSelectedValue(dd, it.value)
         ns.RefreshAll()
+        if RefreshPreview then RefreshPreview() end
       end
       UIDropDownMenu_AddButton(info)
     end
@@ -299,7 +317,7 @@ local function RenderShape(t, db)
   if not t or not db or not previewRoot then return end
   HideAll(t)
 
-  local sizePx = Clamp(db.size or FALLBACKS.size, 6, 80)
+  local sizePx  = Clamp(db.size or FALLBACKS.size, 6, 80)
   local thickPx = Clamp(db.thickness or FALLBACKS.thickness, 1, 10)
   local r,g,b,a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
 
@@ -327,7 +345,7 @@ local function RenderShape(t, db)
   end
 
   if shapeKey == "PLUS" then
-    PlaceOutlined(t.o_plusH, t.plusH, 0, 0, sizePx, thickPx, 0)
+    PlaceOutlined(t.o_plusH, t.plusH, 0, 0, sizePx,  thickPx, 0)
     PlaceOutlined(t.o_plusV, t.plusV, 0, 0, thickPx, sizePx, 0)
 
   elseif shapeKey == "X" then
@@ -356,7 +374,7 @@ local function RenderShape(t, db)
   end
 end
 
-local function RefreshPreview()
+RefreshPreview = function()
   if PT then RenderShape(PT, DB()) end
 end
 
@@ -380,7 +398,7 @@ local function UpdateOutlineSwatch()
   end
 end
 
-local function UpdateControlState()
+UpdateControlState = function()
   local enabledState = (DontLoseMeDB and DontLoseMeDB.enabled) ~= false
 
   if shape then
@@ -406,7 +424,10 @@ local function UpdateControlState()
   if offsetXBoxLbl then offsetXBoxLbl:SetAlpha(a) end
   if offsetYBoxLbl then offsetYBoxLbl:SetAlpha(a) end
 
+  -- outline enabled only when main enabled + outline checkbox is on
   local outlineOn = enabledState and (DB().outlineEnabled and true or false)
+
+  if outlineEnabled then if enabledState then outlineEnabled:Enable() else outlineEnabled:Disable() end end
   if outlineThickness then if outlineOn then outlineThickness:Enable() else outlineThickness:Disable() end end
   if outlineThicknessBox then if outlineOn then outlineThicknessBox:Enable() else outlineThicknessBox:Disable() end end
   if outlineColorBtn then if outlineOn then outlineColorBtn:Enable() else outlineColorBtn:Disable() end end
@@ -526,7 +547,7 @@ end)
 RefreshConditionsCollapse()
 
 -- -------------------------------------------------------------------
--- Shape dropdown + Preview box (FIXED: preview is next to controls)
+-- Shape dropdown + Preview box
 -- -------------------------------------------------------------------
 shapeLabel = MakeLabel(content, "Shape", "TOPLEFT", conditionsSpacer, "BOTTOMLEFT", 2, -14, "GameFontNormal")
 
@@ -539,10 +560,13 @@ shape = MakeDropdown(
     { text = "Chevrons (Up)", value = "CHEVRON_UP" },
   },
   function() return (DontLoseMeDB and DontLoseMeDB.shape) or FALLBACKS.shape end,
-  function(v) DB().shape = v end
+  function(v)
+    DB().shape = v
+  end
 )
 shape:SetPoint("TOPLEFT", shapeLabel, "BOTTOMLEFT", -16, -6)
 
+-- Preview box next to controls
 preview = CreateFrame("Frame", nil, content, "BackdropTemplate")
 preview:SetBackdrop({
   bgFile = "Interface/ChatFrame/ChatFrameBackground",
@@ -575,14 +599,10 @@ size:SetWidth(SLIDER_W)
 
 sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 6, 80,
   function() return DB().size end,
-  function(v) DB().size = v end
+  function(v) DB().size = v end,
+  size
 )
 sizeBox:SetPoint("TOP", size, "BOTTOM", 0, -BOX_GAP)
-
-size:HookScript("OnValueChanged", function()
-  if sizeBox and sizeBox.Refresh then sizeBox:Refresh() end
-  RefreshPreview()
-end)
 
 thickness = MakeSlider(content, "Shape Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.thickness) or FALLBACKS.thickness end,
@@ -593,14 +613,10 @@ thickness:SetWidth(SLIDER_W)
 
 thicknessBox, thicknessBoxLbl = MakeNumberBox(content, "px", 1, 10,
   function() return DB().thickness end,
-  function(v) DB().thickness = v end
+  function(v) DB().thickness = v end,
+  thickness
 )
 thicknessBox:SetPoint("TOP", thickness, "BOTTOM", 0, -BOX_GAP)
-
-thickness:HookScript("OnValueChanged", function()
-  if thicknessBox and thicknessBox.Refresh then thicknessBox:Refresh() end
-  RefreshPreview()
-end)
 
 offsetX = MakeSlider(content, "Shape Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetX) or FALLBACKS.offsetX end,
@@ -611,13 +627,10 @@ offsetX:SetWidth(SLIDER_W)
 
 offsetXBox, offsetXBoxLbl = MakeNumberBox(content, "px", -300, 300,
   function() return DB().offsetX end,
-  function(v) DB().offsetX = v end
+  function(v) DB().offsetX = v end,
+  offsetX
 )
 offsetXBox:SetPoint("TOP", offsetX, "BOTTOM", 0, -BOX_GAP)
-
-offsetX:HookScript("OnValueChanged", function()
-  if offsetXBox and offsetXBox.Refresh then offsetXBox:Refresh() end
-end)
 
 offsetY = MakeSlider(content, "Shape Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DontLoseMeDB.offsetY) or FALLBACKS.offsetY end,
@@ -628,13 +641,10 @@ offsetY:SetWidth(SLIDER_W)
 
 offsetYBox, offsetYBoxLbl = MakeNumberBox(content, "px", -300, 300,
   function() return DB().offsetY end,
-  function(v) DB().offsetY = v end
+  function(v) DB().offsetY = v end,
+  offsetY
 )
 offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
-
-offsetY:HookScript("OnValueChanged", function()
-  if offsetYBox and offsetYBox.Refresh then offsetYBox:Refresh() end
-end)
 
 -- -------------------------------------------------------------------
 -- Color pickers
@@ -684,7 +694,7 @@ colorBtn:SetScript("OnClick", function()
 end)
 
 -- -------------------------------------------------------------------
--- Outline controls (FIXED: button enable + swatch + preview updates)
+-- Outline controls (FIXED: alignment + enable/disable + preview)
 -- -------------------------------------------------------------------
 outlineEnabled = MakeCheckbox(
   content,
@@ -693,6 +703,7 @@ outlineEnabled = MakeCheckbox(
   function() return DB().outlineEnabled and true or false end,
   function(v)
     DB().outlineEnabled = v and true or false
+    UpdateOutlineSwatch()
     UpdateControlState()
     ns.RefreshAll()
     RefreshPreview()
@@ -709,21 +720,17 @@ outlineThickness:SetWidth(SLIDER_W)
 
 outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(content, "px", 1, 10,
   function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
-  function(v) DB().outlineThickness = v end
+  function(v) DB().outlineThickness = v end,
+  outlineThickness
 )
-outlineThicknessBox:ClearAllPoints()
 outlineThicknessBox:SetPoint("TOP", outlineThickness, "BOTTOM", 0, -BOX_GAP)
-
-outlineThickness:HookScript("OnValueChanged", function()
-  if outlineThicknessBox and outlineThicknessBox.Refresh then outlineThicknessBox:Refresh() end
-  RefreshPreview()
-end)
 
 outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
-outlineColorBtn:SetPoint("TOPLEFT", outlineThicknessBox, "BOTTOMLEFT", 0, -18)
+-- IMPORTANT: anchor to the slider, not the centered number box
+outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + 18))
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
@@ -819,6 +826,9 @@ panel:SetScript("OnShow", function()
   if offsetY then offsetY:Refresh() end
   if offsetYBox then offsetYBox:Refresh() end
 
+  if outlineThickness then outlineThickness:Refresh() end
+  if outlineThicknessBox then outlineThicknessBox:Refresh() end
+
   UpdateSwatch()
   UpdateOutlineSwatch()
   UpdateControlState()
@@ -853,4 +863,3 @@ SlashCmdList["DONTLOSEME"] = function()
     print("DontLoseMe: Settings not ready yet.")
   end
 end
-
