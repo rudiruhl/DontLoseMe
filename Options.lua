@@ -390,12 +390,16 @@ local header = MakeLabel(content, "DontLoseMe - Crosshair Settings", "TOPLEFT", 
 local previewFrame = CreateFrame("Frame", nil, content, "BackdropTemplate")
 previewFrame:SetSize(150, 150)
 previewFrame:SetPoint("TOPRIGHT", content, "TOPRIGHT", -20, -10)
+previewFrame:SetFrameStrata("MEDIUM")
+previewFrame:SetFrameLevel(10)
 previewFrame:SetBackdrop({
   bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
   edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
   tile = false, tileSize = 16, edgeSize = 16,
   insets = { left = 4, right = 4, top = 4, bottom = 4 }
 })
+previewFrame:SetBackdropColor(0.1, 0.1, 0.1, 1)
+previewFrame:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)
 
 local previewLabel = MakeLabel(previewFrame, "Preview", "BOTTOM", 0, -20, "GameFontNormalSmall")
 
