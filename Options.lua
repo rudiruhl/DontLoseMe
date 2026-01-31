@@ -374,9 +374,10 @@ content:SetSize(1, 1)
 scroll:SetScrollChild(content)
 
 local SLIDER_W = 240
-local SECTION_GAP = 45
-local BOX_GAP = 5
-local BUTTON_GAP = 8
+local SECTION_GAP = 40
+local BOX_GAP = 6
+local CONTROL_GAP = 16
+local CHECKBOX_GAP = 8
 
 -- -------------------------------------------------------------------
 -- Header
@@ -414,14 +415,14 @@ local enabled = MakeCheckbox(
   function() return DB().enabled end,
   function(v) DB().enabled = v end
 )
-enabled:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -20)
+enabled:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -CONTROL_GAP)
 
 -- -------------------------------------------------------------------
 -- Conditions (collapsible)
 -- -------------------------------------------------------------------
 local condHeader = CreateFrame("Button", nil, content)
 condHeader:SetSize(200, 24)
-condHeader:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -12)
+condHeader:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -CONTROL_GAP)
 condHeader:SetNormalFontObject("GameFontNormal")
 condHeader:SetHighlightFontObject("GameFontHighlight")
 
@@ -434,6 +435,12 @@ local condText = condHeader:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 condText:SetPoint("LEFT", condArrow, "RIGHT", 4, 0)
 condText:SetText("Show Conditions")
 
+-- Spacer frame to manage vertical space when collapsed/expanded
+local condSpacer = CreateFrame("Frame", nil, content)
+condSpacer:SetPoint("TOPLEFT", condHeader, "BOTTOMLEFT", 0, 0)
+condSpacer:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
+condSpacer:SetHeight(1)
+
 local condAlways, condParty, condRaid, condCombat
 
 local function RefreshConditionsCollapse()
@@ -445,12 +452,19 @@ local function RefreshConditionsCollapse()
     if condParty  then condParty:Hide() end
     if condRaid   then condRaid:Hide() end
     if condCombat then condCombat:Hide() end
+    -- Collapsed: minimal height so shape appears with proper spacing
+    condSpacer:SetHeight(CONTROL_GAP)
   else
     condArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
     if condAlways then condAlways:Show() end
     if condParty  then condParty:Show() end
     if condRaid   then condRaid:Show() end
     if condCombat then condCombat:Show() end
+    -- Expanded: height to bottom of last checkbox
+    -- = initial gap + (checkbox height + gap) * 4
+    -- = 8 + (24 + 8) * 4 = 8 + 128 = 136, but last gap is included in checkbox height calc
+    -- Actually: gap + checkbox + gap + checkbox + gap + checkbox + gap + checkbox = 8+24+8+24+8+24+8+24 = 128
+    condSpacer:SetHeight(128)
   end
 end
 
@@ -468,7 +482,7 @@ condAlways = MakeCheckbox(
   function() return Conditions().always end,
   function(v) Conditions().always = v end
 )
-condAlways:SetPoint("TOPLEFT", condHeader, "BOTTOMLEFT", 20, -8)
+condAlways:SetPoint("TOPLEFT", condHeader, "BOTTOMLEFT", 20, -CHECKBOX_GAP)
 
 condParty = MakeCheckbox(
   content,
@@ -477,7 +491,7 @@ condParty = MakeCheckbox(
   function() return Conditions().party end,
   function(v) Conditions().party = v end
 )
-condParty:SetPoint("TOPLEFT", condAlways, "BOTTOMLEFT", 0, -4)
+condParty:SetPoint("TOPLEFT", condAlways, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
 condRaid = MakeCheckbox(
   content,
@@ -486,7 +500,7 @@ condRaid = MakeCheckbox(
   function() return Conditions().raid end,
   function(v) Conditions().raid = v end
 )
-condRaid:SetPoint("TOPLEFT", condParty, "BOTTOMLEFT", 0, -4)
+condRaid:SetPoint("TOPLEFT", condParty, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
 condCombat = MakeCheckbox(
   content,
@@ -495,7 +509,7 @@ condCombat = MakeCheckbox(
   function() return Conditions().combat end,
   function(v) Conditions().combat = v end
 )
-condCombat:SetPoint("TOPLEFT", condRaid, "BOTTOMLEFT", 0, -4)
+condCombat:SetPoint("TOPLEFT", condRaid, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
 -- -------------------------------------------------------------------
 -- Shape
@@ -511,7 +525,7 @@ local shape = MakeDropdown(
   function() return DB().shape or FALLBACKS.shape end,
   function(v) DB().shape = v end
 )
-shape:SetPoint("TOPLEFT", condCombat, "BOTTOMLEFT", -20, -20)
+shape:SetPoint("TOPLEFT", condSpacer, "BOTTOMLEFT", 0, -CONTROL_GAP)
 MakeLabel(content, "Shape", "BOTTOMLEFT", shape, "TOPLEFT", 18, 2)
 
 -- -------------------------------------------------------------------
@@ -526,7 +540,7 @@ size = MakeSlider(content, "Shape Size", 8, 60, 1,
   function() return (DontLoseMeDB and DB().size) or FALLBACKS.size end,
   function(v) DB().size = v end
 )
-size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -30)
+size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -CONTROL_GAP)
 size:SetWidth(SLIDER_W)
 
 sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 8, 60,
@@ -583,7 +597,7 @@ offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 -- -------------------------------------------------------------------
 local colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 colorBtn:SetSize(160, 24)
-colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + BUTTON_GAP))
+colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP))
 colorBtn:SetText("Set Color...")
 
 local swatch = content:CreateTexture(nil, "ARTWORK")
@@ -699,7 +713,7 @@ outlineEnabled = MakeCheckbox(
   content,
   "Enable outline",
   "Draw a separate outline behind the shape.",
-  function() 
+  function()
     local db = DB()
     -- FIX: Return proper boolean
     return db.outlineEnabled == true
@@ -714,13 +728,13 @@ outlineEnabled = MakeCheckbox(
     RefreshPreview()
   end
 )
-outlineEnabled:SetPoint("TOPLEFT", colorBtn, "BOTTOMLEFT", 0, -16)
+outlineEnabled:SetPoint("TOPLEFT", colorBtn, "BOTTOMLEFT", 0, -CONTROL_GAP)
 
 outlineThickness = MakeSlider(content, "Outline Thickness", 1, 10, 1,
   function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
   function(v) DB().outlineThickness = v end
 )
-outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 2, -22)
+outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 outlineThickness:SetWidth(SLIDER_W)
 
 outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(content, "px", 1, 10,
@@ -734,8 +748,8 @@ outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
--- FIX: Anchor to the slider itself for proper alignment
-outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + BUTTON_GAP + 20))
+-- Anchor to the slider with consistent spacing
+outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP))
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
