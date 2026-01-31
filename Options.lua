@@ -384,31 +384,8 @@ local CHECKBOX_GAP = 8
 -- -------------------------------------------------------------------
 local header = MakeLabel(content, "DontLoseMe - Crosshair Settings", "TOPLEFT", 10, -10, "GameFontNormalLarge")
 
--- -------------------------------------------------------------------
--- Preview area
--- -------------------------------------------------------------------
-local previewFrame = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-previewFrame:SetSize(150, 150)
-previewFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -40, -20)
-previewFrame:SetFrameStrata("MEDIUM")
-previewFrame:SetFrameLevel(10)
-previewFrame:SetBackdrop({
-  bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-  tile = false, tileSize = 16, edgeSize = 16,
-  insets = { left = 4, right = 4, top = 4, bottom = 4 }
-})
-previewFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
-previewFrame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0.8)
-
-local previewLabel = MakeLabel(previewFrame, "Preview", "BOTTOM", 0, -20, "GameFontNormalSmall")
-
-local previewTextures = CreateShapeTextures(previewFrame)
-previewFrame:Show()
-
-RefreshPreview = function()
-  RenderPreview(previewFrame, previewTextures)
-end
+-- Preview will be created after size slider
+local previewFrame, previewTextures
 
 -- -------------------------------------------------------------------
 -- Enable checkbox
@@ -545,6 +522,32 @@ size = MakeSlider(content, "Shape Size", 8, 60, 1,
 )
 size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -CONTROL_GAP)
 size:SetWidth(SLIDER_W)
+
+-- -------------------------------------------------------------------
+-- Preview area (positioned next to size slider)
+-- -------------------------------------------------------------------
+previewFrame = CreateFrame("Frame", nil, content, "BackdropTemplate")
+previewFrame:SetSize(150, 150)
+previewFrame:SetPoint("TOPLEFT", size, "TOPRIGHT", 30, 0)
+previewFrame:SetFrameStrata("MEDIUM")
+previewFrame:SetFrameLevel(10)
+previewFrame:SetBackdrop({
+  bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+  tile = false, tileSize = 16, edgeSize = 16,
+  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+})
+previewFrame:SetBackdropColor(0.1, 0.1, 0.1, 0.3)
+previewFrame:SetBackdropBorderColor(0.8, 0.8, 0.8, 0.8)
+
+local previewLabel = MakeLabel(previewFrame, "Preview", "BOTTOM", 0, -20, "GameFontNormalSmall")
+
+previewTextures = CreateShapeTextures(previewFrame)
+previewFrame:Show()
+
+RefreshPreview = function()
+  RenderPreview(previewFrame, previewTextures)
+end
 
 sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 8, 60,
   function() return DB().size end,
