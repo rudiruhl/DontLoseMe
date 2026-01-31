@@ -726,13 +726,13 @@ outlineEnabled = MakeCheckbox(
     RefreshPreview()
   end
 )
-outlineEnabled:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP + 24 + CONTROL_GAP))
+outlineEnabled:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP + 24 + SECTION_GAP))
 
 outlineThickness = MakeSlider(content, "Outline Thickness", 1, 10, 1,
   function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
   function(v) DB().outlineThickness = v end
 )
-outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
+outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 0, -CONTROL_GAP)
 outlineThickness:SetWidth(SLIDER_W)
 
 outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(content, "px", 1, 10,
@@ -746,8 +746,8 @@ outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
--- Anchor to the slider with spacing for number box + section gap
-outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
+-- Center below outline thickness number box
+outlineColorBtn:SetPoint("TOP", outlineThicknessBox, "BOTTOM", 0, -CONTROL_GAP)
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
