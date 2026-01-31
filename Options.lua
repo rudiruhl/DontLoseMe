@@ -389,7 +389,7 @@ local header = MakeLabel(content, "DontLoseMe - Crosshair Settings", "TOPLEFT", 
 -- -------------------------------------------------------------------
 local previewFrame = CreateFrame("Frame", nil, content, "BackdropTemplate")
 previewFrame:SetSize(150, 150)
-previewFrame:SetPoint("TOPRIGHT", content, "TOPRIGHT", -20, -10)
+previewFrame:SetPoint("TOPLEFT", header, "TOPRIGHT", 20, 0)
 previewFrame:SetFrameStrata("MEDIUM")
 previewFrame:SetFrameLevel(10)
 previewFrame:SetBackdrop({
