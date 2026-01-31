@@ -2,7 +2,7 @@
 ## Title: DontLoseMe
 ## Notes: Configurable crosshair to help you keep track of your character.
 ## Author: rudiracoon
-## Version: 1.1.0
+## Version: @project-version@
 ## IconTexture: Interface/AddOns/DontLoseMe/DLMIcon
 ## X-Curse-Project-ID: 1446086
 ## SavedVariables: DontLoseMeDB
