@@ -596,7 +596,7 @@ offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 local colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 colorBtn:SetSize(160, 24)
 colorBtn:SetPoint("TOP", offsetYBox, "BOTTOM", 0, -CONTROL_GAP)
-colorBtn:SetText("Set Color...")
+colorBtn:SetText("Set Shape Color...")
 
 local swatch = content:CreateTexture(nil, "ARTWORK")
 swatch:SetSize(18, 18)
