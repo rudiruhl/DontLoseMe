@@ -460,11 +460,9 @@ local function RefreshConditionsCollapse()
     if condParty  then condParty:Show() end
     if condRaid   then condRaid:Show() end
     if condCombat then condCombat:Show() end
-    -- Expanded: height to bottom of last checkbox
-    -- = initial gap + (checkbox height + gap) * 4
-    -- = 8 + (24 + 8) * 4 = 8 + 128 = 136, but last gap is included in checkbox height calc
-    -- Actually: gap + checkbox + gap + checkbox + gap + checkbox + gap + checkbox = 8+24+8+24+8+24+8+24 = 128
-    condSpacer:SetHeight(128)
+    -- Expanded: height to bottom of last checkbox plus gap before next section
+    -- Checkboxes: 8+24+8+24+8+24+8+24 = 128, plus CONTROL_GAP for spacing after
+    condSpacer:SetHeight(128 + CONTROL_GAP)
   end
 end
 
