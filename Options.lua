@@ -24,9 +24,21 @@ local FALLBACKS = {
   outlineR = 0, outlineG = 0, outlineB = 0, outlineA = 1,
 }
 
+-- FIX: Use per-character database
 local function DB()
-  if not DontLoseMeDB then DontLoseMeDB = {} end
-  return DontLoseMeDB
+  -- ns.db is set by Core.lua after ADDON_LOADED
+  if not ns.db then
+    -- Fallback during early initialization
+    local realm = GetRealmName()
+    local name = UnitName("player")
+    local charKey = name .. "-" .. realm
+    
+    if not DontLoseMeDB then DontLoseMeDB = {} end
+    if not DontLoseMeDB[charKey] then DontLoseMeDB[charKey] = {} end
+    
+    ns.db = DontLoseMeDB[charKey]
+  end
+  return ns.db
 end
 
 local function Conditions()
@@ -52,7 +64,13 @@ end
 
 local function EnsureOutline()
   local db = DB()
-  if db.outlineEnabled == nil then db.outlineEnabled = FALLBACKS.outlineEnabled end
+  -- FIX: Ensure proper boolean type for outlineEnabled
+  if db.outlineEnabled == nil then 
+    db.outlineEnabled = FALLBACKS.outlineEnabled
+  else
+    db.outlineEnabled = db.outlineEnabled and true or false
+  end
+  
   if db.outlineThickness == nil then db.outlineThickness = FALLBACKS.outlineThickness end
   if db.outlineR == nil then db.outlineR = FALLBACKS.outlineR end
   if db.outlineG == nil then db.outlineG = FALLBACKS.outlineG end
@@ -93,13 +111,15 @@ local function MakeCheckbox(parent, label, tooltip, get, set)
   cb.Text:SetText(label)
   cb.tooltipText = tooltip
   cb:SetScript("OnClick", function(self)
-    set(self:GetChecked() and true or false)
+    local checked = self:GetChecked() and true or false
+    set(checked)
     ns.RefreshAll()
     if RefreshPreview then RefreshPreview() end
     if UpdateControlState then UpdateControlState() end
   end)
   cb.Refresh = function()
-    cb:SetChecked(get() and true or false)
+    local value = get()
+    cb:SetChecked(value and true or false)
   end
   return cb
 end
@@ -241,363 +261,275 @@ local function HideAll(t)
   for _, tex in pairs(t) do tex:Hide() end
 end
 
--- -------------------------------------------------------------------
--- Panel + Scroll Container
--- -------------------------------------------------------------------
-local panel = CreateFrame("Frame", "DontLoseMeOptionsPanel", UIParent)
-panel.name = "DontLoseMe"
-
-local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
-scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
-scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -26, 0)
-
-local content = CreateFrame("Frame", nil, scroll)
-content:SetSize(1, 1)
-scroll:SetScrollChild(content)
-
-local LEFT = 24
-local TOP  = -18
-
-local header = MakeLabel(content, "DontLoseMe", "TOPLEFT", nil, nil, LEFT, TOP, "GameFontNormalLarge")
-local sub = MakeLabel(content, "Don’t lose your character in combat — configurable crosshair overlay.", "TOPLEFT", header, "BOTTOMLEFT", 0, -8, "GameFontHighlightSmall")
-
--- Enable checkbox
-local enabled = MakeCheckbox(
-  content,
-  "Enable crosshair",
-  "If no conditions are selected, this will turn off automatically.",
-  function() return (DontLoseMeDB and DontLoseMeDB.enabled) ~= false end,
-  function(v) DB().enabled = v and true or false end
-)
-enabled:SetPoint("TOPLEFT", sub, "BOTTOMLEFT", -2, -12)
-
--- -------------------------------------------------------------------
--- References
--- -------------------------------------------------------------------
-local condAlways, condParty, condRaid, condCombat
-local UpdateScrollHeight
-local shapeLabel, shape
-local preview
-local previewRoot, PT
-
-local size, thickness, offsetX, offsetY
-local sizeBox, offsetXBox, offsetYBox, thicknessBox
-local sizeBoxLbl, offsetXBoxLbl, offsetYBoxLbl, thicknessBoxLbl
-
-local colorBtn, swatch
-
-local outlineEnabled
-local outlineThickness, outlineThicknessBox, outlineThicknessLbl
-local outlineColorBtn, outlineSwatch
-
--- Collapsible conditions
-local conditionsBtn, conditionsHeader, conditionsGroup, conditionsArrow, conditionsSpacer
-local function RefreshConditionsCollapse() end
-
--- Layout constants
-local SLIDER_GAP  = 34
-local BOX_GAP     = 6
-local SECTION_GAP = 50
-local BUTTON_GAP  = 28
-local SLIDER_W    = 200
-
--- -------------------------------------------------------------------
--- Preview renderer (created AFTER preview exists)
--- -------------------------------------------------------------------
-local function PlaceBar(tex, cx, cy, w, h, rot)
-  if not previewRoot then return end
+local function PlaceBarP(tex, parent, cx, cy, w, h, rot)
   tex:ClearAllPoints()
-  tex:SetPoint("CENTER", previewRoot, "CENTER", cx, cy)
+  tex:SetPoint("CENTER", parent, "CENTER", cx, cy)
   tex:SetSize(w, h)
   tex:SetRotation(rot or 0)
   tex:Show()
 end
 
-local function RenderShape(t, db)
-  if not t or not db or not previewRoot then return end
+local function PlaceOutlinedP(outTex, mainTex, parent, cx, cy, w, h, rot, outlineOn, oThick)
+  if outlineOn then
+    PlaceBarP(outTex, parent, cx, cy, w + oThick * 2, h + oThick * 2, rot)
+  else
+    outTex:Hide()
+  end
+  PlaceBarP(mainTex, parent, cx, cy, w, h, rot)
+end
+
+local function PlaceVP(outA, outB, texA, texB, parent, y, armLen, thick, leftRot, rightRot, outlineOn, oThick)
+  local dx = armLen * 0.35
+  PlaceOutlinedP(outA, texA, parent, -dx, y, armLen, thick, leftRot,  outlineOn, oThick)
+  PlaceOutlinedP(outB, texB, parent,  dx, y, armLen, thick, rightRot, outlineOn, oThick)
+end
+
+local function ApplyColorsP(t, r, g, b, a, outR, outG, outB, outA)
+  t.plusH:SetColorTexture(r, g, b, a)
+  t.plusV:SetColorTexture(r, g, b, a)
+  t.xA:SetColorTexture(r, g, b, a)
+  t.xB:SetColorTexture(r, g, b, a)
+  t.ch1A:SetColorTexture(r, g, b, a)
+  t.ch1B:SetColorTexture(r, g, b, a)
+  t.ch2A:SetColorTexture(r, g, b, a)
+  t.ch2B:SetColorTexture(r, g, b, a)
+
+  t.o_plusH:SetColorTexture(outR, outG, outB, outA)
+  t.o_plusV:SetColorTexture(outR, outG, outB, outA)
+  t.o_xA:SetColorTexture(outR, outG, outB, outA)
+  t.o_xB:SetColorTexture(outR, outG, outB, outA)
+  t.o_ch1A:SetColorTexture(outR, outG, outB, outA)
+  t.o_ch1B:SetColorTexture(outR, outG, outB, outA)
+  t.o_ch2A:SetColorTexture(outR, outG, outB, outA)
+  t.o_ch2B:SetColorTexture(outR, outG, outB, outA)
+end
+
+local function RenderPreview(parent, t)
+  local db = DB()
+  local size  = tonumber(db.size) or FALLBACKS.size
+  local thick = tonumber(db.thickness) or FALLBACKS.thickness
+  local shape = db.shape or FALLBACKS.shape
+
+  local r = db.r or FALLBACKS.r
+  local g = db.g or FALLBACKS.g
+  local b = db.b or FALLBACKS.b
+  local a = db.a or FALLBACKS.a
+
+  -- FIX: Properly read boolean value for outline
+  local outlineOn = (db.outlineEnabled == true)
+  local oT = tonumber(db.outlineThickness) or FALLBACKS.outlineThickness
+  if oT < 1 then oT = 1 end
+  if oT > 10 then oT = 10 end
+
+  local outR = db.outlineR or FALLBACKS.outlineR
+  local outG = db.outlineG or FALLBACKS.outlineG
+  local outB = db.outlineB or FALLBACKS.outlineB
+  local outA = db.outlineA or FALLBACKS.outlineA
+
+  ApplyColorsP(t, r, g, b, a, outR, outG, outB, outA)
   HideAll(t)
 
-  local sizePx  = Clamp(db.size or FALLBACKS.size, 6, 80)
-  local thickPx = Clamp(db.thickness or FALLBACKS.thickness, 1, 10)
-  local r,g,b,a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
+  if shape == "X" then
+    PlaceOutlinedP(t.o_xA, t.xA, parent, 0, 0, size, thick, math.rad(45),  outlineOn, oT)
+    PlaceOutlinedP(t.o_xB, t.xB, parent, 0, 0, size, thick, math.rad(-45), outlineOn, oT)
 
-  local outlineOn = db.outlineEnabled and true or false
-  local oT = Clamp(db.outlineThickness or FALLBACKS.outlineThickness, 1, 10)
-  local oR = db.outlineR or FALLBACKS.outlineR
-  local oG = db.outlineG or FALLBACKS.outlineG
-  local oB = db.outlineB or FALLBACKS.outlineB
-  local oA = db.outlineA or FALLBACKS.outlineA
-
-  local shapeKey = db.shape or FALLBACKS.shape
-
-  local function setMain(tex) tex:SetColorTexture(r,g,b,a) end
-  local function setOut(tex)  tex:SetColorTexture(oR,oG,oB,oA) end
-
-  local function PlaceOutlined(outTex, mainTex, cx, cy, w, h, rot)
-    if outlineOn then
-      setOut(outTex)
-      PlaceBar(outTex, cx, cy, w + oT*2, h + oT*2, rot)
-    else
-      outTex:Hide()
-    end
-    setMain(mainTex)
-    PlaceBar(mainTex, cx, cy, w, h, rot)
-  end
-
-  if shapeKey == "PLUS" then
-    PlaceOutlined(t.o_plusH, t.plusH, 0, 0, sizePx,  thickPx, 0)
-    PlaceOutlined(t.o_plusV, t.plusV, 0, 0, thickPx, sizePx, 0)
-
-  elseif shapeKey == "X" then
-    PlaceOutlined(t.o_xA, t.xA, 0, 0, sizePx, thickPx, math.rad(45))
-    PlaceOutlined(t.o_xB, t.xB, 0, 0, sizePx, thickPx, math.rad(-45))
-
-  elseif shapeKey == "CHEVRON_DN" or shapeKey == "CHEVRON_UP" then
+  elseif shape == "CHEVRON_DN" or shape == "CHEVRON_UP" then
     local angle = math.rad(35)
-    local armLen = sizePx
-    local dx = armLen * 0.25
-    local gap = math.max(2, thickPx * 2)
+    local armLen = size
+    local gap = math.max(2, thick * 2)
     local yTop = gap * 0.6
     local yBot = -gap * 0.6
 
     local leftRot, rightRot
-    if shapeKey == "CHEVRON_DN" then
-      leftRot, rightRot = angle, -angle
+    if shape == "CHEVRON_DN" then
+      leftRot  = -angle
+      rightRot = angle
     else
-      leftRot, rightRot = -angle, angle
+      leftRot  = angle
+      rightRot = -angle
     end
 
-    PlaceOutlined(t.o_ch1A, t.ch1A, -dx, yTop, armLen, thickPx, leftRot)
-    PlaceOutlined(t.o_ch1B, t.ch1B,  dx, yTop, armLen, thickPx, rightRot)
-    PlaceOutlined(t.o_ch2A, t.ch2A, -dx, yBot, armLen, thickPx, leftRot)
-    PlaceOutlined(t.o_ch2B, t.ch2B,  dx, yBot, armLen, thickPx, rightRot)
+    PlaceVP(t.o_ch1A, t.o_ch1B, t.ch1A, t.ch1B, parent, yTop, armLen, thick, leftRot, rightRot, outlineOn, oT)
+    PlaceVP(t.o_ch2A, t.o_ch2B, t.ch2A, t.ch2B, parent, yBot, armLen, thick, leftRot, rightRot, outlineOn, oT)
+
+  else
+    PlaceOutlinedP(t.o_plusH, t.plusH, parent, 0, 0, size, thick, 0, outlineOn, oT)
+    PlaceOutlinedP(t.o_plusV, t.plusV, parent, 0, 0, thick, size, 0, outlineOn, oT)
   end
 end
+
+-- -------------------------------------------------------------------
+-- Panel + Scroll Container
+-- -------------------------------------------------------------------
+local panel = CreateFrame("Frame", "DontLoseMeOptions", UIParent)
+panel.name = "DontLoseMe"
+panel:Hide()
+
+local scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
+scroll:SetPoint("TOPLEFT", 10, -10)
+scroll:SetPoint("BOTTOMRIGHT", -30, 10)
+
+local content = CreateFrame("Frame", nil, scroll)
+content:SetSize(1, 1)
+scroll:SetScrollChild(content)
+
+local SLIDER_W = 240
+local SECTION_GAP = 45
+local BOX_GAP = 5
+local BUTTON_GAP = 8
+
+-- -------------------------------------------------------------------
+-- Header
+-- -------------------------------------------------------------------
+local header = MakeLabel(content, "DontLoseMe - Crosshair Settings", "TOPLEFT", 10, -10, "GameFontNormalLarge")
+
+-- -------------------------------------------------------------------
+-- Preview area
+-- -------------------------------------------------------------------
+local previewFrame = CreateFrame("Frame", nil, content, "BackdropTemplate")
+previewFrame:SetSize(150, 150)
+previewFrame:SetPoint("TOPRIGHT", content, "TOPRIGHT", -20, -10)
+previewFrame:SetBackdrop({
+  bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+  tile = false, tileSize = 16, edgeSize = 16,
+  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+})
+
+local previewLabel = MakeLabel(previewFrame, "Preview", "BOTTOM", 0, -20, "GameFontNormalSmall")
+
+local previewTextures = CreateShapeTextures(previewFrame)
 
 RefreshPreview = function()
-  if PT then RenderShape(PT, DB()) end
+  RenderPreview(previewFrame, previewTextures)
 end
 
 -- -------------------------------------------------------------------
--- Swatches + enable/disable states
+-- Enable checkbox
 -- -------------------------------------------------------------------
-local function UpdateSwatch()
-  local db = DB()
-  if swatch then swatch:SetColorTexture(db.r or 1, db.g or 1, db.b or 1, db.a or 1) end
-end
-
-local function UpdateOutlineSwatch()
-  local db = DB()
-  if outlineSwatch then
-    outlineSwatch:SetColorTexture(
-      db.outlineR or FALLBACKS.outlineR,
-      db.outlineG or FALLBACKS.outlineG,
-      db.outlineB or FALLBACKS.outlineB,
-      db.outlineA or FALLBACKS.outlineA
-    )
-  end
-end
-
-UpdateControlState = function()
-  local enabledState = (DontLoseMeDB and DontLoseMeDB.enabled) ~= false
-
-  if shape then
-    if enabledState then UIDropDownMenu_EnableDropDown(shape) else UIDropDownMenu_DisableDropDown(shape) end
-  end
-
-  local function SetEnabled(widget)
-    if not widget then return end
-    if enabledState then widget:Enable() else widget:Disable() end
-  end
-
-  SetEnabled(size); SetEnabled(sizeBox)
-  SetEnabled(thickness); SetEnabled(thicknessBox)
-  SetEnabled(offsetX); SetEnabled(offsetXBox)
-  SetEnabled(offsetY); SetEnabled(offsetYBox)
-  SetEnabled(colorBtn)
-
-  if swatch then swatch:SetAlpha(enabledState and 1 or 0.3) end
-
-  local a = enabledState and 1 or 0.4
-  if sizeBoxLbl then sizeBoxLbl:SetAlpha(a) end
-  if thicknessBoxLbl then thicknessBoxLbl:SetAlpha(a) end
-  if offsetXBoxLbl then offsetXBoxLbl:SetAlpha(a) end
-  if offsetYBoxLbl then offsetYBoxLbl:SetAlpha(a) end
-
-  -- outline enabled only when main enabled + outline checkbox is on
-  local outlineOn = enabledState and (DB().outlineEnabled and true or false)
-
-  if outlineEnabled then if enabledState then outlineEnabled:Enable() else outlineEnabled:Disable() end end
-  if outlineThickness then if outlineOn then outlineThickness:Enable() else outlineThickness:Disable() end end
-  if outlineThicknessBox then if outlineOn then outlineThicknessBox:Enable() else outlineThicknessBox:Disable() end end
-  if outlineColorBtn then if outlineOn then outlineColorBtn:Enable() else outlineColorBtn:Disable() end end
-  if outlineSwatch then outlineSwatch:SetAlpha(outlineOn and 1 or 0.3) end
-
-  RefreshPreview()
-end
-
--- -------------------------------------------------------------------
--- Conditions rules
--- -------------------------------------------------------------------
-local function ApplyConditionRules(changedKey)
-  local db = DB()
-  local c = Conditions()
-
-  if changedKey == "always" and c.always then
-    c.party = false
-    c.raid = false
-    c.combat = false
-  end
-
-  if changedKey ~= "always" and c[changedKey] then
-    c.always = false
-  end
-
-  local any = (c.always or c.party or c.raid or c.combat) and true or false
-  db.enabled = any and true or false
-
-  if condAlways then condAlways:Refresh() end
-  if condParty  then condParty:Refresh() end
-  if condRaid   then condRaid:Refresh() end
-  if condCombat then condCombat:Refresh() end
-  enabled:Refresh()
-
-  UpdateControlState()
-  ns.RefreshAll()
-end
+local enabled = MakeCheckbox(
+  content,
+  "Enable crosshair",
+  "Enable or disable the addon.",
+  function() return DB().enabled end,
+  function(v) DB().enabled = v end
+)
+enabled:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -20)
 
 -- -------------------------------------------------------------------
 -- Conditions (collapsible)
 -- -------------------------------------------------------------------
-conditionsBtn = CreateFrame("Button", nil, content)
-conditionsBtn:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -12)
-conditionsBtn:SetSize(260, 20)
+local condHeader = CreateFrame("Button", nil, content)
+condHeader:SetSize(200, 24)
+condHeader:SetPoint("TOPLEFT", enabled, "BOTTOMLEFT", 0, -12)
+condHeader:SetNormalFontObject("GameFontNormal")
+condHeader:SetHighlightFontObject("GameFontHighlight")
 
-conditionsHeader = MakeLabel(conditionsBtn, "Conditions", "LEFT", conditionsBtn, "LEFT", 34, 0, "GameFontNormal")
+local condArrow = condHeader:CreateTexture(nil, "ARTWORK")
+condArrow:SetSize(16, 16)
+condArrow:SetPoint("LEFT")
+condArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
 
-conditionsArrow = conditionsBtn:CreateTexture(nil, "ARTWORK")
-conditionsArrow:SetSize(26, 26)
-conditionsArrow:SetPoint("LEFT", conditionsBtn, "LEFT", 6, 0)
-conditionsArrow:SetTexture("Interface/Buttons/UI-SpellbookIcon-NextPage-Up")
+local condText = condHeader:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+condText:SetPoint("LEFT", condArrow, "RIGHT", 4, 0)
+condText:SetText("Show Conditions")
 
-conditionsSpacer = CreateFrame("Frame", nil, content)
-conditionsSpacer:SetPoint("TOPLEFT", conditionsBtn, "BOTTOMLEFT", 0, -4)
-conditionsSpacer:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
-conditionsSpacer:SetHeight(10)
+local condAlways, condParty, condRaid, condCombat
 
-conditionsGroup = CreateFrame("Frame", nil, content)
-conditionsGroup:SetPoint("TOPLEFT", conditionsSpacer, "TOPLEFT", 0, 0)
-conditionsGroup:SetSize(1, 1)
-
-local function MakeCondCheckbox(text, key, anchorTo, x, y)
-  local cb = MakeCheckbox(
-    conditionsGroup,
-    text,
-    nil,
-    function()
-      local c = (DontLoseMeDB and DontLoseMeDB.conditions) or FALLBACKS.conditions
-      return c[key] and true or false
-    end,
-    function(v)
-      local c = Conditions()
-      c[key] = v and true or false
-      ApplyConditionRules(key)
-    end
-  )
-  cb:SetPoint("TOPLEFT", anchorTo, "BOTTOMLEFT", x or 0, y or -6)
-  return cb
-end
-
-condAlways = MakeCondCheckbox("Always", "always", conditionsGroup, 20, 0)
-condParty  = MakeCondCheckbox("In Party", "party",  condAlways, 0, -6)
-condRaid   = MakeCondCheckbox("In Raid",  "raid",   condParty, 0, -6)
-condCombat = MakeCondCheckbox("Only in combat", "combat", condRaid, 0, -6)
-
-function RefreshConditionsCollapse()
-  EnsureUIState()
-  local collapsed = DB().ui.conditionsCollapsed and true or false
-
+local function RefreshConditionsCollapse()
+  local db = DB()
+  local collapsed = db.ui and db.ui.conditionsCollapsed
   if collapsed then
-    conditionsGroup:Hide()
-    conditionsSpacer:SetHeight(10)
-    conditionsArrow:SetRotation(0)
+    condArrow:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+    if condAlways then condAlways:Hide() end
+    if condParty  then condParty:Hide() end
+    if condRaid   then condRaid:Hide() end
+    if condCombat then condCombat:Hide() end
   else
-    conditionsGroup:Show()
-    conditionsArrow:SetRotation(math.rad(90))
-
-    local bottom = condCombat and condCombat:GetBottom()
-    local top = conditionsGroup:GetTop()
-    if bottom and top then
-      local h = (top - bottom) + 12
-      if h < 1 then h = 1 end
-      conditionsSpacer:SetHeight(h)
-    else
-      conditionsSpacer:SetHeight(90)
-    end
+    condArrow:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+    if condAlways then condAlways:Show() end
+    if condParty  then condParty:Show() end
+    if condRaid   then condRaid:Show() end
+    if condCombat then condCombat:Show() end
   end
 end
 
-conditionsBtn:SetScript("OnClick", function()
-  EnsureUIState()
-  DB().ui.conditionsCollapsed = not DB().ui.conditionsCollapsed
+condHeader:SetScript("OnClick", function()
+  local db = DB()
+  if not db.ui then db.ui = {} end
+  db.ui.conditionsCollapsed = not db.ui.conditionsCollapsed
   RefreshConditionsCollapse()
-  if UpdateScrollHeight then UpdateScrollHeight() end
 end)
 
-RefreshConditionsCollapse()
+condAlways = MakeCheckbox(
+  content,
+  "Always",
+  "Show crosshair at all times.",
+  function() return Conditions().always end,
+  function(v) Conditions().always = v end
+)
+condAlways:SetPoint("TOPLEFT", condHeader, "BOTTOMLEFT", 20, -8)
+
+condParty = MakeCheckbox(
+  content,
+  "In Party",
+  "Show only when in a party (not raid).",
+  function() return Conditions().party end,
+  function(v) Conditions().party = v end
+)
+condParty:SetPoint("TOPLEFT", condAlways, "BOTTOMLEFT", 0, -4)
+
+condRaid = MakeCheckbox(
+  content,
+  "In Raid",
+  "Show only when in a raid.",
+  function() return Conditions().raid end,
+  function(v) Conditions().raid = v end
+)
+condRaid:SetPoint("TOPLEFT", condParty, "BOTTOMLEFT", 0, -4)
+
+condCombat = MakeCheckbox(
+  content,
+  "In Combat",
+  "Show only when in combat (works with above).",
+  function() return Conditions().combat end,
+  function(v) Conditions().combat = v end
+)
+condCombat:SetPoint("TOPLEFT", condRaid, "BOTTOMLEFT", 0, -4)
 
 -- -------------------------------------------------------------------
--- Shape dropdown + Preview box
+-- Shape
 -- -------------------------------------------------------------------
-shapeLabel = MakeLabel(content, "Shape", "TOPLEFT", conditionsSpacer, "BOTTOMLEFT", 2, -14, "GameFontNormal")
-
-shape = MakeDropdown(
+local shape = MakeDropdown(
   content,
   {
     { text = "Plus (+)", value = "PLUS" },
-    { text = "X (diagonal)", value = "X" },
-    { text = "Chevrons (Down)", value = "CHEVRON_DN" },
-    { text = "Chevrons (Up)", value = "CHEVRON_UP" },
+    { text = "Cross (X)", value = "X" },
+    { text = "Chevron Down (V)", value = "CHEVRON_DN" },
+    { text = "Chevron Up (^)", value = "CHEVRON_UP" },
   },
-  function() return (DontLoseMeDB and DontLoseMeDB.shape) or FALLBACKS.shape end,
-  function(v)
-    DB().shape = v
-  end
+  function() return DB().shape or FALLBACKS.shape end,
+  function(v) DB().shape = v end
 )
-shape:SetPoint("TOPLEFT", shapeLabel, "BOTTOMLEFT", -16, -6)
-
--- Preview box next to controls
-preview = CreateFrame("Frame", nil, content, "BackdropTemplate")
-preview:SetBackdrop({
-  bgFile = "Interface/ChatFrame/ChatFrameBackground",
-  edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-  tile = true, tileSize = 16, edgeSize = 12,
-  insets = { left = 3, right = 3, top = 3, bottom = 3 },
-})
-preview:SetBackdropColor(0, 0, 0, 0.35)
-
-preview:SetSize(260, 260)
-preview:ClearAllPoints()
-preview:SetPoint("TOPLEFT", shape, "TOPRIGHT", 40, -6)
-
-local previewTitle = MakeLabel(content, "Preview", "BOTTOMLEFT", preview, "TOPLEFT", 6, 6, "GameFontNormal")
-
-previewRoot = CreateFrame("Frame", nil, preview)
-previewRoot:SetPoint("CENTER", preview, "CENTER", 0, 0)
-previewRoot:SetSize(1, 1)
-PT = CreateShapeTextures(previewRoot)
+shape:SetPoint("TOPLEFT", condCombat, "BOTTOMLEFT", -20, -20)
+MakeLabel(content, "Shape", "BOTTOMLEFT", shape, "TOPLEFT", 18, 2)
 
 -- -------------------------------------------------------------------
--- Sliders & inputs
+-- Sliders + Number boxes
 -- -------------------------------------------------------------------
-size = MakeSlider(content, "Shape Size", 6, 80, 1,
-  function() return (DontLoseMeDB and DontLoseMeDB.size) or FALLBACKS.size end,
+local size, sizeBox, sizeBoxLbl
+local thickness, thicknessBox, thicknessBoxLbl
+local offsetX, offsetXBox, offsetXBoxLbl
+local offsetY, offsetYBox, offsetYBoxLbl
+
+size = MakeSlider(content, "Shape Size", 8, 60, 1,
+  function() return (DontLoseMeDB and DB().size) or FALLBACKS.size end,
   function(v) DB().size = v end
 )
-size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 16, -SLIDER_GAP)
+size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -30)
 size:SetWidth(SLIDER_W)
 
-sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 6, 80,
+sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 8, 60,
   function() return DB().size end,
   function(v) DB().size = v end,
   size
@@ -605,7 +537,7 @@ sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 6, 80,
 sizeBox:SetPoint("TOP", size, "BOTTOM", 0, -BOX_GAP)
 
 thickness = MakeSlider(content, "Shape Thickness", 1, 10, 1,
-  function() return (DontLoseMeDB and DontLoseMeDB.thickness) or FALLBACKS.thickness end,
+  function() return (DontLoseMeDB and DB().thickness) or FALLBACKS.thickness end,
   function(v) DB().thickness = v end
 )
 thickness:SetPoint("TOPLEFT", size, "BOTTOMLEFT", 0, -SECTION_GAP)
@@ -619,7 +551,7 @@ thicknessBox, thicknessBoxLbl = MakeNumberBox(content, "px", 1, 10,
 thicknessBox:SetPoint("TOP", thickness, "BOTTOM", 0, -BOX_GAP)
 
 offsetX = MakeSlider(content, "Shape Offset X", -300, 300, 1,
-  function() return (DontLoseMeDB and DontLoseMeDB.offsetX) or FALLBACKS.offsetX end,
+  function() return (DontLoseMeDB and DB().offsetX) or FALLBACKS.offsetX end,
   function(v) DB().offsetX = v end
 )
 offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -SECTION_GAP)
@@ -633,7 +565,7 @@ offsetXBox, offsetXBoxLbl = MakeNumberBox(content, "px", -300, 300,
 offsetXBox:SetPoint("TOP", offsetX, "BOTTOM", 0, -BOX_GAP)
 
 offsetY = MakeSlider(content, "Shape Offset Y", -300, 300, 1,
-  function() return (DontLoseMeDB and DontLoseMeDB.offsetY) or FALLBACKS.offsetY end,
+  function() return (DontLoseMeDB and DB().offsetY) or FALLBACKS.offsetY end,
   function(v) DB().offsetY = v end
 )
 offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -SECTION_GAP)
@@ -649,14 +581,24 @@ offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 -- -------------------------------------------------------------------
 -- Color pickers
 -- -------------------------------------------------------------------
-colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+local colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 colorBtn:SetSize(160, 24)
 colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + BUTTON_GAP))
 colorBtn:SetText("Set Color...")
 
-swatch = content:CreateTexture(nil, "ARTWORK")
+local swatch = content:CreateTexture(nil, "ARTWORK")
 swatch:SetSize(18, 18)
 swatch:SetPoint("LEFT", colorBtn, "RIGHT", 12, 0)
+
+local function UpdateSwatch()
+  local db = DB()
+  swatch:SetColorTexture(
+    db.r or FALLBACKS.r,
+    db.g or FALLBACKS.g,
+    db.b or FALLBACKS.b,
+    db.a or FALLBACKS.a
+  )
+end
 
 colorBtn:SetScript("OnClick", function()
   local db = DB()
@@ -694,15 +636,78 @@ colorBtn:SetScript("OnClick", function()
 end)
 
 -- -------------------------------------------------------------------
--- Outline controls (FIXED: alignment + enable/disable + preview)
+-- Outline controls
 -- -------------------------------------------------------------------
+local outlineEnabled, outlineThickness, outlineThicknessBox, outlineThicknessLbl
+local outlineColorBtn, outlineSwatch
+
+local function UpdateOutlineSwatch()
+  local db = DB()
+  outlineSwatch:SetColorTexture(
+    db.outlineR or FALLBACKS.outlineR,
+    db.outlineG or FALLBACKS.outlineG,
+    db.outlineB or FALLBACKS.outlineB,
+    db.outlineA or FALLBACKS.outlineA
+  )
+end
+
+UpdateControlState = function()
+  local db = DB()
+  -- FIX: Properly check boolean value
+  local enabled = (db.outlineEnabled == true)
+  
+  if outlineThickness then
+    if enabled then
+      outlineThickness:Enable()
+      outlineThickness:SetAlpha(1)
+    else
+      outlineThickness:Disable()
+      outlineThickness:SetAlpha(0.5)
+    end
+  end
+  
+  if outlineThicknessBox then
+    if enabled then
+      outlineThicknessBox:Enable()
+      outlineThicknessBox:SetAlpha(1)
+    else
+      outlineThicknessBox:Disable()
+      outlineThicknessBox:SetAlpha(0.5)
+    end
+  end
+  
+  if outlineThicknessLbl then
+    outlineThicknessLbl:SetAlpha(enabled and 1 or 0.5)
+  end
+  
+  if outlineColorBtn then
+    if enabled then
+      outlineColorBtn:Enable()
+      outlineColorBtn:SetAlpha(1)
+    else
+      outlineColorBtn:Disable()
+      outlineColorBtn:SetAlpha(0.5)
+    end
+  end
+  
+  if outlineSwatch then
+    outlineSwatch:SetAlpha(enabled and 1 or 0.5)
+  end
+end
+
 outlineEnabled = MakeCheckbox(
   content,
   "Enable outline",
   "Draw a separate outline behind the shape.",
-  function() return DB().outlineEnabled and true or false end,
+  function() 
+    local db = DB()
+    -- FIX: Return proper boolean
+    return db.outlineEnabled == true
+  end,
   function(v)
-    DB().outlineEnabled = v and true or false
+    local db = DB()
+    -- FIX: Store as proper boolean
+    db.outlineEnabled = v and true or false
     UpdateOutlineSwatch()
     UpdateControlState()
     ns.RefreshAll()
@@ -729,8 +734,8 @@ outlineColorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 outlineColorBtn:SetSize(160, 24)
 outlineColorBtn:SetText("Set Outline Color...")
 outlineColorBtn:ClearAllPoints()
--- IMPORTANT: anchor to the slider, not the centered number box
-outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + 18))
+-- FIX: Anchor to the slider itself for proper alignment
+outlineColorBtn:SetPoint("TOPLEFT", outlineThickness, "BOTTOMLEFT", 0, -(BOX_GAP + BUTTON_GAP + 20))
 
 outlineSwatch = content:CreateTexture(nil, "ARTWORK")
 outlineSwatch:SetSize(18, 18)
@@ -787,7 +792,7 @@ end)
 -- -------------------------------------------------------------------
 -- Scroll height calculation
 -- -------------------------------------------------------------------
-UpdateScrollHeight = function()
+local UpdateScrollHeight = function()
   local last = outlineColorBtn or colorBtn
   local bottom = last and last:GetBottom()
   local top = header and header:GetTop()
@@ -828,6 +833,7 @@ panel:SetScript("OnShow", function()
 
   if outlineThickness then outlineThickness:Refresh() end
   if outlineThicknessBox then outlineThicknessBox:Refresh() end
+  if outlineEnabled then outlineEnabled:Refresh() end
 
   UpdateSwatch()
   UpdateOutlineSwatch()

@@ -32,7 +32,7 @@ local defaults = {
 }
 
 -- -------------------------------------------------------------------
--- Database handling
+-- Database handling (PER CHARACTER)
 -- -------------------------------------------------------------------
 local function CopyDefaults(src, dst)
   if type(dst) ~= "table" then dst = {} end
@@ -46,40 +46,77 @@ local function CopyDefaults(src, dst)
   return dst
 end
 
--- DB must exist immediately
-DontLoseMeDB = CopyDefaults(defaults, DontLoseMeDB or {})
-
--- Migration: old single-mode -> conditions table
-if DontLoseMeDB.mode and (not DontLoseMeDB.conditions or type(DontLoseMeDB.conditions) ~= "table") then
-  DontLoseMeDB.conditions = {
-    always = DontLoseMeDB.mode == "ALWAYS",
-    party  = DontLoseMeDB.mode == "PARTY",
-    raid   = DontLoseMeDB.mode == "RAID",
-    combat = false,
-  }
-  DontLoseMeDB.mode = nil
-end
-
--- Migration: old outline keys (or_/og/ob/oa) -> outlineR/G/B/A
-if DontLoseMeDB.or_ ~= nil or DontLoseMeDB.og ~= nil or DontLoseMeDB.ob ~= nil or DontLoseMeDB.oa ~= nil then
-  if DontLoseMeDB.outlineR == nil and DontLoseMeDB.or_ ~= nil then DontLoseMeDB.outlineR = DontLoseMeDB.or_ end
-  if DontLoseMeDB.outlineG == nil and DontLoseMeDB.og ~= nil then DontLoseMeDB.outlineG = DontLoseMeDB.og end
-  if DontLoseMeDB.outlineB == nil and DontLoseMeDB.ob ~= nil then DontLoseMeDB.outlineB = DontLoseMeDB.ob end
-  if DontLoseMeDB.outlineA == nil and DontLoseMeDB.oa ~= nil then DontLoseMeDB.outlineA = DontLoseMeDB.oa end
-  DontLoseMeDB.or_, DontLoseMeDB.og, DontLoseMeDB.ob, DontLoseMeDB.oa = nil, nil, nil, nil
-end
-
--- Ensure all condition fields exist
-do
-  local c = DontLoseMeDB.conditions
-  if type(c) ~= "table" then
-    DontLoseMeDB.conditions = CopyDefaults(defaults.conditions, {})
-    c = DontLoseMeDB.conditions
+-- IMPORTANT: Initialize per-character DB
+-- DontLoseMeDB will now be a table with character-specific entries
+local function InitDB()
+  -- Create global table structure if it doesn't exist
+  if type(DontLoseMeDB) ~= "table" then
+    DontLoseMeDB = {}
   end
-  if c.always == nil then c.always = true end
-  if c.party  == nil then c.party  = false end
-  if c.raid   == nil then c.raid   = false end
-  if c.combat == nil then c.combat = false end
+  
+  -- Get character-specific key
+  local realm = GetRealmName()
+  local name = UnitName("player")
+  local charKey = name .. "-" .. realm
+  
+  -- Initialize this character's settings if they don't exist
+  if type(DontLoseMeDB[charKey]) ~= "table" then
+    DontLoseMeDB[charKey] = CopyDefaults(defaults, {})
+  else
+    -- Apply defaults for any missing keys
+    DontLoseMeDB[charKey] = CopyDefaults(defaults, DontLoseMeDB[charKey])
+  end
+  
+  -- Create easy accessor
+  ns.db = DontLoseMeDB[charKey]
+  
+  return ns.db
+end
+
+-- Will be called on PLAYER_LOGIN
+local function PerformMigrations()
+  local db = ns.db
+  
+  -- Migration: old single-mode -> conditions table
+  if db.mode and (not db.conditions or type(db.conditions) ~= "table") then
+    db.conditions = {
+      always = db.mode == "ALWAYS",
+      party  = db.mode == "PARTY",
+      raid   = db.mode == "RAID",
+      combat = false,
+    }
+    db.mode = nil
+  end
+
+  -- Migration: old outline keys (or_/og/ob/oa) -> outlineR/G/B/A
+  if db.or_ ~= nil or db.og ~= nil or db.ob ~= nil or db.oa ~= nil then
+    if db.outlineR == nil and db.or_ ~= nil then db.outlineR = db.or_ end
+    if db.outlineG == nil and db.og ~= nil then db.outlineG = db.og end
+    if db.outlineB == nil and db.ob ~= nil then db.outlineB = db.ob end
+    if db.outlineA == nil and db.oa ~= nil then db.outlineA = db.oa end
+    db.or_, db.og, db.ob, db.oa = nil, nil, nil, nil
+  end
+
+  -- Ensure all condition fields exist
+  do
+    local c = db.conditions
+    if type(c) ~= "table" then
+      db.conditions = CopyDefaults(defaults.conditions, {})
+      c = db.conditions
+    end
+    if c.always == nil then c.always = true end
+    if c.party  == nil then c.party  = false end
+    if c.raid   == nil then c.raid   = false end
+    if c.combat == nil then c.combat = false end
+  end
+  
+  -- FIX: Ensure outlineEnabled is properly set as boolean
+  if db.outlineEnabled == nil then
+    db.outlineEnabled = defaults.outlineEnabled
+  else
+    -- Convert to proper boolean if it's stored as number or anything else
+    db.outlineEnabled = db.outlineEnabled and true or false
+  end
 end
 
 -- -------------------------------------------------------------------
@@ -178,7 +215,7 @@ end
 -- Layout
 -- -------------------------------------------------------------------
 local function ApplyLayout()
-  local db = DontLoseMeDB
+  local db = ns.db
   if not db then return end
 
   Root:ClearAllPoints()
@@ -191,8 +228,8 @@ local function ApplyLayout()
   -- Main color
   local r, g, b, a = db.r or 1, db.g or 1, db.b or 1, db.a or 1
 
-  -- Outline settings
-  local outlineOn = db.outlineEnabled and true or false
+  -- Outline settings - FIX: properly read boolean value
+  local outlineOn = (db.outlineEnabled == true)
   local oT = tonumber(db.outlineThickness) or defaults.outlineThickness
   if oT < 1 then oT = 1 end
   if oT > 10 then oT = 10 end
@@ -250,7 +287,7 @@ local function AnyContextSelected(c)
 end
 
 local function ShouldShow()
-  local db = DontLoseMeDB
+  local db = ns.db
   if not db or not db.enabled then return false end
 
   local c = db.conditions or defaults.conditions
@@ -294,17 +331,39 @@ end
 -- Event handling
 -- -------------------------------------------------------------------
 local ev = CreateFrame("Frame")
+ev:RegisterEvent("ADDON_LOADED")
+ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("PLAYER_ENTERING_WORLD")
 ev:RegisterEvent("GROUP_ROSTER_UPDATE")
 ev:RegisterEvent("PLAYER_REGEN_ENABLED")
 ev:RegisterEvent("PLAYER_REGEN_DISABLED")
 
-ev:SetScript("OnEvent", function(_, event)
-  if event == "PLAYER_ENTERING_WORLD" then
+local isInitialized = false
+
+ev:SetScript("OnEvent", function(_, event, arg1)
+  if event == "ADDON_LOADED" and arg1 == ADDON then
+    -- Initialize per-character database
+    InitDB()
+    
+  elseif event == "PLAYER_LOGIN" then
+    -- Perform migrations after DB is fully loaded
+    PerformMigrations()
+    isInitialized = true
     ns.RefreshAll()
+    
+  elseif event == "PLAYER_ENTERING_WORLD" then
+    if isInitialized then
+      ns.RefreshAll()
+    end
+    
   elseif event == "GROUP_ROSTER_UPDATE" then
-    RefreshVisibility()
+    if isInitialized then
+      RefreshVisibility()
+    end
+    
   elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
-    RefreshVisibility()
+    if isInitialized then
+      RefreshVisibility()
+    end
   end
 end)
