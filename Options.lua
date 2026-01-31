@@ -595,7 +595,7 @@ offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 -- -------------------------------------------------------------------
 local colorBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
 colorBtn:SetSize(160, 24)
-colorBtn:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
+colorBtn:SetPoint("TOP", offsetYBox, "BOTTOM", 0, -CONTROL_GAP)
 colorBtn:SetText("Set Color...")
 
 local swatch = content:CreateTexture(nil, "ARTWORK")
@@ -726,7 +726,7 @@ outlineEnabled = MakeCheckbox(
     RefreshPreview()
   end
 )
-outlineEnabled:SetPoint("TOPLEFT", colorBtn, "BOTTOMLEFT", 0, -CONTROL_GAP)
+outlineEnabled:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP + 24 + CONTROL_GAP))
 
 outlineThickness = MakeSlider(content, "Outline Thickness", 1, 10, 1,
   function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
