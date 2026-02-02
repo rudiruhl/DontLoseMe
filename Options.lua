@@ -79,6 +79,48 @@ end
 -- Forward declarations (needed because helpers call these)
 local RefreshPreview
 local UpdateControlState
+local UpdateConditionsState
+
+-- Forward declarations for ApplyAll
+local swatch, outlineSwatch
+
+-- -------------------------------------------------------------------
+-- Control tracking
+-- -------------------------------------------------------------------
+-- Track all controls with .Refresh() methods for centralized refresh
+local controls = {}
+local function Track(ctrl)
+  if ctrl and ctrl.Refresh then
+    table.insert(controls, ctrl)
+  end
+  return ctrl
+end
+
+-- Central update function: refresh crosshair, preview, and all UI state
+local function ApplyAll()
+  ns.RefreshAll()
+  if RefreshPreview then RefreshPreview() end
+  if swatch then
+    local db = DB()
+    swatch:SetColorTexture(
+      db.r or FALLBACKS.r,
+      db.g or FALLBACKS.g,
+      db.b or FALLBACKS.b,
+      db.a or FALLBACKS.a
+    )
+  end
+  if outlineSwatch then
+    local db = DB()
+    outlineSwatch:SetColorTexture(
+      db.outlineR or FALLBACKS.outlineR,
+      db.outlineG or FALLBACKS.outlineG,
+      db.outlineB or FALLBACKS.outlineB,
+      db.outlineA or FALLBACKS.outlineA
+    )
+  end
+  if UpdateControlState then UpdateControlState() end
+  if UpdateConditionsState then UpdateConditionsState() end
+end
 
 -- -------------------------------------------------------------------
 -- UI helpers
@@ -101,9 +143,7 @@ local function MakeCheckbox(parent, label, tooltip, get, set)
   cb:SetScript("OnClick", function(self)
     local checked = self:GetChecked() and true or false
     set(checked)
-    ns.RefreshAll()
-    if RefreshPreview then RefreshPreview() end
-    if UpdateControlState then UpdateControlState() end
+    ApplyAll()
   end)
   cb.Refresh = function()
     local value = get()
@@ -130,8 +170,7 @@ local function MakeSlider(parent, label, minv, maxv, step, get, set)
       s.linkedNumberBox.Refresh()
     end
 
-    ns.RefreshAll()
-    if RefreshPreview then RefreshPreview() end
+    ApplyAll()
   end)
 
   s.Refresh = function()
@@ -170,8 +209,7 @@ local function MakeNumberBox(parent, label, minv, maxv, getFunc, setFunc, linked
       end
     end
 
-    ns.RefreshAll()
-    if RefreshPreview then RefreshPreview() end
+    ApplyAll()
   end
 
   eb:SetScript("OnEnterPressed", function(self)
@@ -202,8 +240,7 @@ local function MakeDropdown(parent, items, get, set)
       info.func = function()
         set(it.value)
         UIDropDownMenu_SetSelectedValue(dd, it.value)
-        ns.RefreshAll()
-        if RefreshPreview then RefreshPreview() end
+        ApplyAll()
       end
       UIDropDownMenu_AddButton(info)
     end
@@ -384,13 +421,13 @@ local previewFrame, previewTextures
 -- -------------------------------------------------------------------
 -- Enable checkbox
 -- -------------------------------------------------------------------
-local enabled = MakeCheckbox(
+local enabled = Track(MakeCheckbox(
   content,
   "Enable crosshair",
   "Enable or disable the addon.",
   function() return DB().enabled end,
   function(v) DB().enabled = v end
-)
+))
 enabled:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -CONTROL_GAP)
 
 -- -------------------------------------------------------------------
@@ -419,6 +456,28 @@ condSpacer:SetHeight(1)
 
 local condAlways, condParty, condRaid, condCombat
 
+-- Enable/disable Party and Raid checkboxes based on Always state
+UpdateConditionsState = function()
+  if not condAlways or not condParty or not condRaid then return end
+
+  local alwaysChecked = Conditions().always
+
+  -- When Always is checked, Party and Raid are irrelevant
+  if alwaysChecked then
+    condParty:Disable()
+    condParty:SetAlpha(0.5)
+    condRaid:Disable()
+    condRaid:SetAlpha(0.5)
+  else
+    condParty:Enable()
+    condParty:SetAlpha(1)
+    condRaid:Enable()
+    condRaid:SetAlpha(1)
+  end
+
+  -- Combat is always enabled (acts as modifier)
+end
+
 local function RefreshConditionsCollapse()
   local db = DB()
   local collapsed = db.ui and db.ui.conditionsCollapsed
@@ -439,6 +498,8 @@ local function RefreshConditionsCollapse()
     -- Expanded: height to bottom of last checkbox plus gap before next section
     -- Checkboxes: 8+24+8+24+8+24+8+24 = 128, plus CONTROL_GAP for spacing after
     condSpacer:SetHeight(128 + CONTROL_GAP)
+    -- Update enable/disable state when expanding
+    if UpdateConditionsState then UpdateConditionsState() end
   end
 end
 
@@ -449,46 +510,46 @@ condHeader:SetScript("OnClick", function()
   RefreshConditionsCollapse()
 end)
 
-condAlways = MakeCheckbox(
+condAlways = Track(MakeCheckbox(
   content,
   "Always",
   "Show crosshair at all times.",
   function() return Conditions().always end,
   function(v) Conditions().always = v end
-)
+))
 condAlways:SetPoint("TOPLEFT", condHeader, "BOTTOMLEFT", 20, -CHECKBOX_GAP)
 
-condParty = MakeCheckbox(
+condParty = Track(MakeCheckbox(
   content,
   "In Party",
   "Show only when in a party (not raid).",
   function() return Conditions().party end,
   function(v) Conditions().party = v end
-)
+))
 condParty:SetPoint("TOPLEFT", condAlways, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
-condRaid = MakeCheckbox(
+condRaid = Track(MakeCheckbox(
   content,
   "In Raid",
   "Show only when in a raid.",
   function() return Conditions().raid end,
   function(v) Conditions().raid = v end
-)
+))
 condRaid:SetPoint("TOPLEFT", condParty, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
-condCombat = MakeCheckbox(
+condCombat = Track(MakeCheckbox(
   content,
-  "In Combat",
-  "Show only when in combat (works with above).",
+  "Only in combat",
+  "Requires the selected context above.",
   function() return Conditions().combat end,
   function(v) Conditions().combat = v end
-)
+))
 condCombat:SetPoint("TOPLEFT", condRaid, "BOTTOMLEFT", 0, -CHECKBOX_GAP)
 
 -- -------------------------------------------------------------------
 -- Shape
 -- -------------------------------------------------------------------
-local shape = MakeDropdown(
+local shape = Track(MakeDropdown(
   content,
   {
     { text = "Plus (+)", value = "PLUS" },
@@ -498,7 +559,7 @@ local shape = MakeDropdown(
   },
   function() return DB().shape or FALLBACKS.shape end,
   function(v) DB().shape = v end
-)
+))
 shape:SetPoint("TOPLEFT", condSpacer, "BOTTOMLEFT", 0, -CONTROL_GAP)
 MakeLabel(content, "Shape", "BOTTOMLEFT", shape, "TOPLEFT", 18, 2)
 
@@ -510,10 +571,10 @@ local thickness, thicknessBox, thicknessBoxLbl
 local offsetX, offsetXBox, offsetXBoxLbl
 local offsetY, offsetYBox, offsetYBoxLbl
 
-size = MakeSlider(content, "Shape Size", 8, 60, 1,
+size = Track(MakeSlider(content, "Shape Size", 8, 60, 1,
   function() return (DontLoseMeDB and DB().size) or FALLBACKS.size end,
   function(v) DB().size = v end
-)
+))
 size:SetPoint("TOPLEFT", shape, "BOTTOMLEFT", 0, -CONTROL_GAP)
 size:SetWidth(SLIDER_W)
 
@@ -548,13 +609,14 @@ sizeBox, sizeBoxLbl = MakeNumberBox(content, "px", 8, 60,
   function(v) DB().size = v end,
   size
 )
+Track(sizeBox)
 sizeBox:SetPoint("TOP", size, "BOTTOM", 0, -BOX_GAP)
 size.linkedNumberBox = sizeBox
 
-thickness = MakeSlider(content, "Shape Thickness", 1, 10, 1,
+thickness = Track(MakeSlider(content, "Shape Thickness", 1, 10, 1,
   function() return (DontLoseMeDB and DB().thickness) or FALLBACKS.thickness end,
   function(v) DB().thickness = v end
-)
+))
 thickness:SetPoint("TOPLEFT", size, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 thickness:SetWidth(SLIDER_W)
 
@@ -563,13 +625,14 @@ thicknessBox, thicknessBoxLbl = MakeNumberBox(content, "px", 1, 10,
   function(v) DB().thickness = v end,
   thickness
 )
+Track(thicknessBox)
 thicknessBox:SetPoint("TOP", thickness, "BOTTOM", 0, -BOX_GAP)
 thickness.linkedNumberBox = thicknessBox
 
-offsetX = MakeSlider(content, "Shape Offset X", -300, 300, 1,
+offsetX = Track(MakeSlider(content, "Shape Offset X", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetX) or FALLBACKS.offsetX end,
   function(v) DB().offsetX = v end
-)
+))
 offsetX:SetPoint("TOPLEFT", thickness, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 offsetX:SetWidth(SLIDER_W)
 
@@ -578,13 +641,14 @@ offsetXBox, offsetXBoxLbl = MakeNumberBox(content, "px", -300, 300,
   function(v) DB().offsetX = v end,
   offsetX
 )
+Track(offsetXBox)
 offsetXBox:SetPoint("TOP", offsetX, "BOTTOM", 0, -BOX_GAP)
 offsetX.linkedNumberBox = offsetXBox
 
-offsetY = MakeSlider(content, "Shape Offset Y", -300, 300, 1,
+offsetY = Track(MakeSlider(content, "Shape Offset Y", -300, 300, 1,
   function() return (DontLoseMeDB and DB().offsetY) or FALLBACKS.offsetY end,
   function(v) DB().offsetY = v end
-)
+))
 offsetY:SetPoint("TOPLEFT", offsetX, "BOTTOMLEFT", 0, -(BOX_GAP + SECTION_GAP))
 offsetY:SetWidth(SLIDER_W)
 
@@ -593,6 +657,7 @@ offsetYBox, offsetYBoxLbl = MakeNumberBox(content, "px", -300, 300,
   function(v) DB().offsetY = v end,
   offsetY
 )
+Track(offsetYBox)
 offsetYBox:SetPoint("TOP", offsetY, "BOTTOM", 0, -BOX_GAP)
 offsetY.linkedNumberBox = offsetYBox
 
@@ -604,19 +669,9 @@ colorBtn:SetSize(160, 24)
 colorBtn:SetPoint("TOP", offsetYBox, "BOTTOM", 0, -CONTROL_GAP)
 colorBtn:SetText("Set Shape Color...")
 
-local swatch = content:CreateTexture(nil, "ARTWORK")
+swatch = content:CreateTexture(nil, "ARTWORK")
 swatch:SetSize(18, 18)
 swatch:SetPoint("LEFT", colorBtn, "RIGHT", 12, 0)
-
-local function UpdateSwatch()
-  local db = DB()
-  swatch:SetColorTexture(
-    db.r or FALLBACKS.r,
-    db.g or FALLBACKS.g,
-    db.b or FALLBACKS.b,
-    db.a or FALLBACKS.a
-  )
-end
 
 colorBtn:SetScript("OnClick", function()
   local db = DB()
@@ -634,9 +689,7 @@ colorBtn:SetScript("OnClick", function()
     local r, g, b = ColorPickerFrame:GetColorRGB()
     local opacity = (OpacitySliderFrame and OpacitySliderFrame:GetValue()) or info.opacity or 0
     db.r, db.g, db.b, db.a = r, g, b, (1 - opacity)
-    UpdateSwatch()
-    ns.RefreshAll()
-    RefreshPreview()
+    ApplyAll()
   end
   info.opacityFunc = info.swatchFunc
 
@@ -644,9 +697,7 @@ colorBtn:SetScript("OnClick", function()
     if type(prev) == "table" then
       db.r, db.g, db.b = prev[1], prev[2], prev[3]
       db.a = 1 - (prev[4] or 0)
-      UpdateSwatch()
-      ns.RefreshAll()
-      RefreshPreview()
+      ApplyAll()
     end
   end
 
@@ -657,17 +708,7 @@ end)
 -- Outline controls
 -- -------------------------------------------------------------------
 local outlineEnabled, outlineThickness, outlineThicknessBox, outlineThicknessLbl
-local outlineColorBtn, outlineSwatch
-
-local function UpdateOutlineSwatch()
-  local db = DB()
-  outlineSwatch:SetColorTexture(
-    db.outlineR or FALLBACKS.outlineR,
-    db.outlineG or FALLBACKS.outlineG,
-    db.outlineB or FALLBACKS.outlineB,
-    db.outlineA or FALLBACKS.outlineA
-  )
-end
+local outlineColorBtn
 
 UpdateControlState = function()
   local db = DB()
@@ -713,31 +754,25 @@ UpdateControlState = function()
   end
 end
 
-outlineEnabled = MakeCheckbox(
+outlineEnabled = Track(MakeCheckbox(
   content,
   "Enable outline",
   "Draw a separate outline behind the shape.",
   function()
     local db = DB()
-    -- FIX: Return proper boolean
     return db.outlineEnabled == true
   end,
   function(v)
     local db = DB()
-    -- FIX: Store as proper boolean
     db.outlineEnabled = v and true or false
-    UpdateOutlineSwatch()
-    UpdateControlState()
-    ns.RefreshAll()
-    RefreshPreview()
   end
-)
+))
 outlineEnabled:SetPoint("TOPLEFT", offsetY, "BOTTOMLEFT", 0, -(BOX_GAP + CONTROL_GAP + 24 + SECTION_GAP))
 
-outlineThickness = MakeSlider(content, "Outline Thickness", 1, 10, 1,
+outlineThickness = Track(MakeSlider(content, "Outline Thickness", 1, 10, 1,
   function() return DB().outlineThickness or FALLBACKS.outlineThickness end,
   function(v) DB().outlineThickness = v end
-)
+))
 outlineThickness:SetPoint("TOPLEFT", outlineEnabled, "BOTTOMLEFT", 0, -CONTROL_GAP)
 outlineThickness:SetWidth(SLIDER_W)
 
@@ -746,6 +781,7 @@ outlineThicknessBox, outlineThicknessLbl = MakeNumberBox(content, "px", 1, 10,
   function(v) DB().outlineThickness = v end,
   outlineThickness
 )
+Track(outlineThicknessBox)
 outlineThicknessBox:SetPoint("TOP", outlineThickness, "BOTTOM", 0, -BOX_GAP)
 outlineThickness.linkedNumberBox = outlineThicknessBox
 
@@ -786,9 +822,7 @@ outlineColorBtn:SetScript("OnClick", function()
     db.outlineB = b
     db.outlineA = 1 - opacity
 
-    UpdateOutlineSwatch()
-    ns.RefreshAll()
-    RefreshPreview()
+    ApplyAll()
   end
   info.opacityFunc = info.swatchFunc
 
@@ -799,9 +833,7 @@ outlineColorBtn:SetScript("OnClick", function()
       db.outlineB = prev[3]
       db.outlineA = 1 - (prev[4] or 0)
 
-      UpdateOutlineSwatch()
-      ns.RefreshAll()
-      RefreshPreview()
+      ApplyAll()
     end
   end
 
@@ -809,10 +841,48 @@ outlineColorBtn:SetScript("OnClick", function()
 end)
 
 -- -------------------------------------------------------------------
+-- Reset button
+-- -------------------------------------------------------------------
+local resetBtn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+resetBtn:SetSize(140, 24)
+resetBtn:SetPoint("TOP", outlineColorBtn, "BOTTOM", 0, -SECTION_GAP)
+resetBtn:SetText("Reset to defaults")
+
+-- Reset character's settings to defaults, preserving UI state
+resetBtn:SetScript("OnClick", function()
+  local db = DB()
+  if not db then return end
+
+  -- Preserve UI-only state (collapse)
+  local uiState = db.ui
+
+  -- Reset all settings to defaults (from FALLBACKS)
+  for k, v in pairs(FALLBACKS) do
+    if type(v) == "table" then
+      db[k] = {}
+      for k2, v2 in pairs(v) do
+        db[k][k2] = v2
+      end
+    else
+      db[k] = v
+    end
+  end
+
+  -- Restore UI state
+  db.ui = uiState
+
+  -- Refresh all controls and crosshair
+  for _, ctrl in ipairs(controls) do
+    if ctrl.Refresh then ctrl.Refresh() end
+  end
+  ApplyAll()
+end)
+
+-- -------------------------------------------------------------------
 -- Scroll height calculation
 -- -------------------------------------------------------------------
 local UpdateScrollHeight = function()
-  local last = outlineColorBtn or colorBtn
+  local last = resetBtn or outlineColorBtn or colorBtn
   local bottom = last and last:GetBottom()
   local top = header and header:GetTop()
 
@@ -834,31 +904,16 @@ panel:SetScript("OnShow", function()
 
   RefreshConditionsCollapse()
 
-  if enabled then enabled:Refresh() end
-  if condAlways then condAlways:Refresh() end
-  if condParty  then condParty:Refresh() end
-  if condRaid   then condRaid:Refresh() end
-  if condCombat then condCombat:Refresh() end
+  -- Refresh all tracked controls
+  for _, ctrl in ipairs(controls) do
+    if ctrl and ctrl.Refresh then
+      ctrl:Refresh()
+    end
+  end
 
-  if shape then shape:Refresh() end
-  if size then size:Refresh() end
-  if sizeBox then sizeBox:Refresh() end
-  if thickness then thickness:Refresh() end
-  if thicknessBox then thicknessBox:Refresh() end
-  if offsetX then offsetX:Refresh() end
-  if offsetXBox then offsetXBox:Refresh() end
-  if offsetY then offsetY:Refresh() end
-  if offsetYBox then offsetYBox:Refresh() end
-
-  if outlineThickness then outlineThickness:Refresh() end
-  if outlineThicknessBox then outlineThicknessBox:Refresh() end
-  if outlineEnabled then outlineEnabled:Refresh() end
-
-  UpdateSwatch()
-  UpdateOutlineSwatch()
-  UpdateControlState()
+  -- Apply all updates (includes swatches, preview, control states)
+  ApplyAll()
   UpdateScrollHeight()
-  RefreshPreview()
 end)
 
 panel:SetScript("OnSizeChanged", function()
