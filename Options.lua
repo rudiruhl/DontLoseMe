@@ -98,10 +98,12 @@ end
 
 -- Central update function: refresh crosshair, preview, and all UI state
 local function ApplyAll()
+  local db = DB()
+  if not db then return end
+
   ns.RefreshAll()
   if RefreshPreview then RefreshPreview() end
   if swatch then
-    local db = DB()
     swatch:SetColorTexture(
       db.r or FALLBACKS.r,
       db.g or FALLBACKS.g,
@@ -110,7 +112,6 @@ local function ApplyAll()
     )
   end
   if outlineSwatch then
-    local db = DB()
     outlineSwatch:SetColorTexture(
       db.outlineR or FALLBACKS.outlineR,
       db.outlineG or FALLBACKS.outlineG,
