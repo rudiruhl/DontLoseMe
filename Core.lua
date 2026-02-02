@@ -53,12 +53,17 @@ local function InitDB()
   if type(DontLoseMeDB) ~= "table" then
     DontLoseMeDB = {}
   end
-  
-  -- Get character-specific key
+
+  -- Get character-specific key - only proceed if both exist
   local realm = GetRealmName()
   local name = UnitName("player")
+
+  if not realm or realm == "" or not name or name == "" then
+    return false
+  end
+
   local charKey = name .. "-" .. realm
-  
+
   -- Initialize this character's settings if they don't exist
   if type(DontLoseMeDB[charKey]) ~= "table" then
     DontLoseMeDB[charKey] = CopyDefaults(defaults, {})
@@ -66,11 +71,11 @@ local function InitDB()
     -- Apply defaults for any missing keys
     DontLoseMeDB[charKey] = CopyDefaults(defaults, DontLoseMeDB[charKey])
   end
-  
+
   -- Create easy accessor
   ns.db = DontLoseMeDB[charKey]
-  
-  return ns.db
+
+  return true
 end
 
 -- Will be called on PLAYER_LOGIN
@@ -342,25 +347,38 @@ local isInitialized = false
 
 ev:SetScript("OnEvent", function(_, event, arg1)
   if event == "ADDON_LOADED" and arg1 == ADDON then
-    -- Initialize per-character database
+    -- Try to initialize per-character database
     InitDB()
-    
+
   elseif event == "PLAYER_LOGIN" then
-    -- Perform migrations after DB is fully loaded
-    PerformMigrations()
-    isInitialized = true
-    ns.RefreshAll()
-    
+    -- Ensure DB is initialized (retry if ADDON_LOADED was too early)
+    if not ns.db then
+      InitDB()
+    end
+
+    if ns.db then
+      -- Perform migrations after DB is fully loaded
+      PerformMigrations()
+      isInitialized = true
+
+      -- Register options UI now that DB is ready
+      if ns.RegisterOptions then
+        ns.RegisterOptions()
+      end
+
+      ns.RefreshAll()
+    end
+
   elseif event == "PLAYER_ENTERING_WORLD" then
     if isInitialized then
       ns.RefreshAll()
     end
-    
+
   elseif event == "GROUP_ROSTER_UPDATE" then
     if isInitialized then
       RefreshVisibility()
     end
-    
+
   elseif event == "PLAYER_REGEN_ENABLED" or event == "PLAYER_REGEN_DISABLED" then
     if isInitialized then
       RefreshVisibility()

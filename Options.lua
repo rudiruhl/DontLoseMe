@@ -24,20 +24,8 @@ local FALLBACKS = {
   outlineR = 0, outlineG = 0, outlineB = 0, outlineA = 1,
 }
 
--- FIX: Use per-character database
+-- Database accessor - ns.db is set by Core.lua
 local function DB()
-  -- ns.db is set by Core.lua after ADDON_LOADED
-  if not ns.db then
-    -- Fallback during early initialization
-    local realm = GetRealmName()
-    local name = UnitName("player")
-    local charKey = name .. "-" .. realm
-    
-    if not DontLoseMeDB then DontLoseMeDB = {} end
-    if not DontLoseMeDB[charKey] then DontLoseMeDB[charKey] = {} end
-    
-    ns.db = DontLoseMeDB[charKey]
-  end
   return ns.db
 end
 
@@ -887,7 +875,10 @@ local function RegisterSettingsCategory()
   DontLoseMe.CATEGORY_ID = category:GetID()
 end
 
-RegisterSettingsCategory()
+-- Expose for Core.lua to call after DB init
+function ns.RegisterOptions()
+  RegisterSettingsCategory()
+end
 
 -- Slash commands
 SLASH_DONTLOSEME1 = "/dontloseme"
