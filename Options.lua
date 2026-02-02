@@ -25,11 +25,17 @@ local FALLBACKS = {
 }
 
 -- Database accessor - ns.db is set by Core.lua
+-- Returns empty table if DB not yet initialized (prevents errors during UI creation)
 local function DB()
-  return ns.db
+  return ns.db or {}
 end
 
 local function Conditions()
+  -- Return fallback if database not yet initialized
+  if not ns.db then
+    return FALLBACKS.conditions
+  end
+
   local db = DB()
   if type(db.conditions) ~= "table" then
     db.conditions = { always = true, party = false, raid = false, combat = false }
@@ -43,6 +49,7 @@ end
 
 -- UI-only saved state (collapse)
 local function EnsureUIState()
+  if not ns.db then return end  -- Database not initialized yet
   local db = DB()
   if type(db.ui) ~= "table" then db.ui = {} end
   if db.ui.conditionsCollapsed == nil then
@@ -51,14 +58,15 @@ local function EnsureUIState()
 end
 
 local function EnsureOutline()
+  if not ns.db then return end  -- Database not initialized yet
   local db = DB()
   -- FIX: Ensure proper boolean type for outlineEnabled
-  if db.outlineEnabled == nil then 
+  if db.outlineEnabled == nil then
     db.outlineEnabled = FALLBACKS.outlineEnabled
   else
     db.outlineEnabled = db.outlineEnabled and true or false
   end
-  
+
   if db.outlineThickness == nil then db.outlineThickness = FALLBACKS.outlineThickness end
   if db.outlineR == nil then db.outlineR = FALLBACKS.outlineR end
   if db.outlineG == nil then db.outlineG = FALLBACKS.outlineG end
@@ -98,8 +106,8 @@ end
 
 -- Central update function: refresh crosshair, preview, and all UI state
 local function ApplyAll()
+  if not ns.db then return end  -- Database not initialized yet
   local db = DB()
-  if not db then return end
 
   ns.RefreshAll()
   if RefreshPreview then RefreshPreview() end
